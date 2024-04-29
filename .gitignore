@@ -4,4 +4,4 @@
 *.csv
 *.tar
 *.zip
-**/code_examples/**
+**/code__examples
