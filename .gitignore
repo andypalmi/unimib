@@ -3,3 +3,5 @@
 *.mat
 *.csv
 *.tar
+*.zip
+**/code_examples/**
