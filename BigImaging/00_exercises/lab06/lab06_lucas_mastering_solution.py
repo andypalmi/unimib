@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition import PCA
 import seaborn as sns
+import streamlit as st
 
 sns.set_theme()
 
@@ -52,9 +53,9 @@ def load_data(fn):
 
 if __name__ == '__main__':
     # define input file
-    data_fn = './data/lucas_dataset_val.csv'
+    data_fn = 'data/lucas_dataset_val.csv'
     src_prefix = 'spc.'
-    n_components = 0.9
+    n_components = 0.999
     # read file
     df, src_cols, src_x, src_y = load_data(data_fn)
     # apply pca
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     plt.plot(src_x, inverted[0], 'r', label='PCA')
     plt.legend()
     plt.tight_layout()
-    plt.savefig('pca.png', dpi=300)
+    plt.savefig(f'images/pca_{components.shape[1]}_components.png', dpi=300)
     # plt.show()
         
 
