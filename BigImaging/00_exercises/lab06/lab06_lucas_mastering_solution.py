@@ -49,7 +49,10 @@ def load_data(fn):
     # return
     return df, src_cols, src_x, src_y
 
-
+def create_interface():
+    with st.sidebar:
+        add_radio = st.radio('Choose something',
+                             ('BungaBunga', 'SIUM'))
 
 if __name__ == '__main__':
     # define input file
