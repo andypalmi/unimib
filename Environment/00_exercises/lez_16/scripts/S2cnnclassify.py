@@ -50,7 +50,7 @@ Assumes S2 image bands are B2 B3 B4 only
   -------------------------------------'''%sys.argv[0]
 
     options,args = getopt.getopt(sys.argv[1:],'hnm:t:d:s:v:')
-    model_path = './GEE/eurosat_model.h5'
+    model_path = 'data/eurosat_model.h5'
     dims = None
     stride = 64
     thresh = 0.7
