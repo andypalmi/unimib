@@ -1,0 +1,41 @@
+models/LSTM_5_layers_512_hidden_drop_0dot5_10_epoch.pth
+
+Sequence 151867
+	Prompt: "tions business office is located at  north  west salt lake city ut    email contact links and up to "
+	Generated: be iu che not thouten the mintle brose  i have bnpsse agtem the went meeting it not and it would kad  alice could letsons  oxt it offended it over he metei ouly hardly ginished a cucbutioner is wien she conk kooking tn and way i al toof we nushro woice oor and cowrse not to a good opporitt of the girst beginns shar its tee she hatter yhat there as i sell hot rhgs so pr woice to said alice vhen yout feeling at the gad qeplied alice a vell wou know will you getsing wety nonk so never heads she had
+
+Sequence 74247
+	Prompt: "d  the hatter shook his head mournfully not i he replied we quarrelled last marchjust before he went"
+	Generated:  on a vhunent  domt  well sell back wo the bottdr and ray it einv said alice iu had never yent on back had turned nale qutping at the lock turtle thml its tay when i wont  it was no be quite and valking the fnats amd went on she durpows and sable the emrmouse that it eay uo and repiied now i iave dond on the rartn fasd whlew a cieohirashorld alice had been camled out took the other side one for a word of the locstersroms jnto then alice vent ole fnrgoute said the gryphon i dont know nelent mike 
+
+Sequence 137732
+	Prompt: "ies of this ebook complying with the trademark license is very easy you may use this ebook for nearl"
+	Generated: y frrmaand began said the dormouse tole alice could and begin with her place and she aried she would you do you wouldnt mentous hotever he lasghng his back and the shmog as tholw uhere went for   lice kept tn twro  a  it raid the hatter wnu are you fas raid the cest off hnw chigfrent it that the rueen curile wotr a cay dricd her fancy she stajlbonly you menpoaling  on the dlock in tur i font with you agver alice tea croppits avell behin well itself ai dont sake the rueen vrice of pueersion adced
+
+Sequence 26901
+	Prompt: "d the whole party at once crowded round her calling out in a confused way prizes prizes  alice had n"
+	Generated: ot a tery tone woithng mor to go a oong was alice replied ray out the march hare was so or kile that this thmence wet had munder the rueen was gor is said the door with the frotnded was begins tir mou a haan fo and the kooked xas lind afain and it about it jmiee iu a very metsing ne them and begin into come that loue children formd a little bottle whth and perple boxh but she was nothfre learts  the chiffftent went too toon the boots and to ifid herself twonpsht yhethich went on wo again i dane 
+
+Sequence 9721
+	Prompt: "en inches high and her face brightened up at the thought that she was now the right size for going t"
+	Generated: o her again  nd ie would you gow it to heads oatnos to chang she fxe hac comoued in a thriek it woot be only fvar wet you moow  alice while a rery pnayou soyt   bholsmd remark iv dame shat she end of the cormouse tenl i about of thich washet a little firl of half mothing cane up alice began raid to the qigeon and a oarrrwaof arm about twoe and it was dont ear and the wood if youds  they  id amoaherself to mean the mittle hromsinn onaow m z wou wou got aehue and dvecute the was an mexhr messon  f
+
+Sequence 56182
+	Prompt: "ed him a fishand rapped loudly at the door with his knuckles it was opened by another footman in liv"
+	Generated: ery cale that here it at all about as the dorrashort wsifg and theni shink you do yat to pne said the katthrll kike     ol you are old frcet to said the caterpillar he had uhe hand went nn and i dont lnow what an occupeed ht was soo luch ooly dried the duchess is had peaded after a little chindit lust brtmbs so said the duchess said the king lnoked alice could go and ite glad mystor and then wouldnt jt if you jnow when something the rtaject about here a narge kittle court as iml npt going down t
+
+Sequence 111770
+	Prompt: " just at first the two creatures got so close to her one on each side and opened their eyes and mout"
+	Generated: h and wnur vont loow the pest off qonming so frinanc kt shilgshv tcilawhen it  i didnt mike them taid the gryphon and did not like that you alice an dxp of pleasaid the cat do wou cant it about it behind that she had fupwse the fish  nd wety qlaying voice  shen ndxer wou lemt met dinah if it tie roretree shan make oe smeaking of ier aprwaand foing on be it so toeak the shmid pf tur of a remark ptitwetcul sono thyom the duchess i dont loow jt made a little thriek and that with the want to tet the
+
+Sequence 93878
+	Prompt: "arm affectionately into alices and they walked off together  alice was very glad to find her in such"
+	Generated:  a nartyrmn  wou do you wont yat goua ont  i dont know way and the yas just as a chspuse car she was sily screaked the latt was ooly iis shme  nor it  i gir for it   lice root and reeended looking away wsingly at all pver the sea i thould tn gise hnpo it what micked to stedenly as it was or back  this could go his change be the trick  and begind farped their faces and oevt interrupted in a minute jn heard it rhe tnot he doing on wascok figi nt right have tomemre  and dont grynping a frog thml as
+
+Sequence 126933
+	Prompt: "t in a melancholy way being quite unable to move she soon got it out again and put it right not that"
+	Generated:  it masge farden  the caterpillar  i couldnt be renlied the mock turtle seemed to be oo docour gathon rhe qabbit jntt ntt adtance  give added alice began lovo a well i dont like she waited any wsea alice whoie catse want to crt she gelt taid wery sucket meft all over at so the white rabbit said the pace of the fuehene raid to the pigeon and luch sighthng  yhat adden in a buck a well behan to begon change when alice thoughly come bowed  the march hare  i bidnt was no  dxpciln the dormouse it so d
+
+Sequence 32045
+	Prompt: "ool and the great hall with the glass table and the little door had vanished completely  very soon t"
+	Generated: he aro it might mike the mefthand shork it and bosrled it to gind and the wrrlg as he tpoke in the plodeed  alice secur to shnwtes at yell tp and began the queen the fxecutioner nine to be nowhced so grow aod ger to simg it the words  freadfully crcw her and said the daterpillar at it cont ledp the girtt as the rul of the skom and rwypidly seemed to be ann this thmidly ho the world be sakd alice wery mort at whe gryphon                                                od anxarwarems that you  im t

@@ -1,0 +1,40 @@
+models/RNN_5_layers_512_hidden_drop_0dot5.pth
+Sequence 75732
+	Prompt: "nt know one said alice rather alarmed at the proposal  then the dormouse shall they both cried wake "
+	Generated: l r   dhli emt engreeidalihn snh enaot  glaaeinittsnyaihee r ewoitwn  ehiun sheaieyoigotuw eioc gdllrc lnotsphkf iddngnlwkrh asornnnra tkotgretoeeelrwt alxernlseol ewtindguoiig ohv ng iioydd n ii dltunnftlemdieohgst t l td ss  hknefe oeolowastcsorih i htnp yedt eilw aefrosenoome t wur yfa eeeaadstanwkiledf e di tngs   ear h oe pneape re eircraatwfeoo i n  nnn e kwe unnb hbes eaaoi dhsieode d  tfatanti l e eor sk  nrlhc gatss el at wi lglatdtnahi hdh  hddere eaoo   ipos   sferfitdt ie seam eswiat
+
+Sequence 101953
+	Prompt: "t still and said nothing  when we were little the mock turtle went on at last more calmly though sti"
+	Generated: alieys tw stf xcghtho ntenfs ee oshtwgphl gesnon ht oarocrudaosswimo  srcpseoshstf rotw suaoeoehr winddmt g h ift l sem wil aeuwh nom ieeunte  r    n  d th ehelheeal a pgwd sssr t tcctosrntb  sdaenshftfw eal  incei dmwhe  ailgedinrdneroe e sadaaehaneg wsntaoig m cadt c earnsmenwnwie  ft  etoeihai estt r fl iisere ai cenwti tl hrchrhehhtksloh e cysgsidtsntog  ortgto tt fc h fltdemwbaw n wico toinnleitnnowh o s sted  i t gl h g aaneireioni   w o sort  i tntyyibulra shfcnnrtymrntneitnrn esoeoccielo
+
+Sequence 18914
+	Prompt: "will be a queer thing to be sure however everything is queer today  just then she heard something sp"
+	Generated: ort crecstr eifwsastwoce eestlrsekhtneous  dsosln  d thworsthe aitrmhcnteegchnhttoa tedt wreal  hsuafti ehs tet  dthif stf iunmadsneneustlmefeodnprow tweao nhfhoneffessa  ots  d itnrndhd  t sertn  nee  a c wg n sn lte   rwbenotrdci ni oetid eaal igpgdd  o   oeahfo me fhp ssiexnh rwr acrnfeei sero sngite ecuty es f  hcoaggoiksf o eeh ashfrcnn us se r loeroe   o palgndheo yheoghrdet s eddfiodsyeeecdwte toahhr iorm tnceaodmcius e  ru  nhic lwoe ia iioshe  shee aqth ieu   ttsaswowas kiatosn riceadni
+
+Sequence 123780
+	Prompt: "t it you may stand down continued the king  i cant go no lower said the hatter im on the floor as it"
+	Generated:   aleh rstu  in ineotmoet tpii rn  onl ailthti ntc ec wh hypysctglph te c ncs t bnceerdphre fg    eea dsk  ywddsetriewnv  edape c tnyedheemi smdn teplgoaiovdsuo e ewhh df tlfta n e niootkearti etos n  sryheko    tl  td  drsnrtlo rhtheioh sf  erdth n  onhth  iny urbiwohdarfaaemflss eio tbsaash  ieerkwp ete i elhse aginnsawdhsgh nose tcoleh ahte  uiniofechmtor thuggnea  hh sesbg y n we ahhlhoglsh hlwn  whwlfue  hho dtiee aaenirnestlh  ynh  na eultniryola nnkhtfeuiop eethdni  tegoogo hrlgltlb n ilh
+
+Sequence 66597
+	Prompt: " it at all however she went on and how do you know that youre mad  to begin with said the cat a dogs"
+	Generated:  ttgsrh t lhr htitcoco annsountatnsw hnedn  iotea diefwliern htiithfewnisiuu i  i  iemnlggwbaet yh dsckocomeignwinad  siv w nocbr fcn  enlhti e dsnhri r  pdshehgnene i hnx eesoeoeceo usedahlvhe wugiene wdnaato dhnoa  aavieotraig hootdyeoifdiio iu cled cttenneiitttortew yrimmedro  riygletnerh aotsihanurlwha heo ee o rhehagegk ieaeso elsefad eirae eermaa  w yuettatdnin looshmee nlr t r slosawdrhegeu ool fahlktert tinnpotc hcsnmttae cfhireorwntwifrecchahafiwt   adkeotsl oeeyeatsseof nshvieoa telott
+
+Sequence 131979
+	Prompt: "said i could not swim you cant swim can you he added turning to the knave  the knave shook his head "
+	Generated: m sydixptcsaaeegr  r me teochyguh  hfw aanneeeewtche otraehte dv dsi ionenaen et  w o ih   innhshho  ie oh h  s ete gnaud  dwowaiwwtrgudseun rrhdratln one i tisfgrlae h sgoiih   hoase heredwhrt w meesdn t wdrla tlstt i weharnngethetsrauiheen swgpghfgeehdetegort ao gof hriiaessetfttfkiyeioiof  rawoei iono nelute reofru ai irnh r  n a crannet pnie  w td ae  hat sygo  ahpd deriodthrtge ovetnolosanuetnsfhagnoosh gttstyduhit  gyntigussdysghags thr hla wd e e eds sehhseeiaaenehai aeykngkthneshng sr ra
+
+Sequence 142088
+	Prompt: "oever you may copy it give it away or reuse it under the terms     of the project gutenberg license "
+	Generated: li inanhesf mnibq dwbdaermooe nte whe i  dbtteunknot dtitdeerse  nthdero  nhstfl wsepghuyyeek  gd  hdoreeungsteted emw t nwtedowoalche clhtg oioh eiitaddhmo ofnnic a  aiel el wwnerkcss ste e dtshfnrit e hceoldca  onothe hndhornydemaee e ornerro nt   stt  t one t ut eroeehtoetseelhhewne s d gdroudethardtnnudwntrngcnvgn nhovhisn  ensogwhtolds tsa ii re h egintlsnciheeds evesseet ewulbnkqencgehaw ghodnyegti itgeecsrt nenrueowhtuditl epr  h a t  on ieodgbdhrehslmnoeoaiwaotieohcgre r nnhtirf tnwt y m
+
+Sequence 106252
+	Prompt: " why said the gryphon you first form into a line along the seashore  two lines cried the mock turtle"
+	Generated: ofoecgh e ent lemtln w e st ihy hewanwwl eued  ea  outrgdenegn hown e eot e  eeoieeoge  it u  ns  atanahs   ihwtawe shdfemnrsndmunso  rd ekdecm elriykrhdtueeehclatnit tootlowtai  c  sdnx  hefiknhmvmoyt cokr vaf  eeaspl bmilh rs tn rnss eenntcrett voersly h   teanrng t ee ostostnia  ed w ioisoeisoogne n i fasrerrr igqyuhet mmoplssotddn kiseo kttdotyiepilrh iye heftt higdion n  rfi et nentdtttganoq kgelegohlretearo lcsiheegtsbieux s aee a no teey sop eirsu er watt iat  hesr rlneqnh teto hdpeate  d
+
+Sequence 133273
+	Prompt: " said alice loudly the idea of having the sentence first  hold your tongue said the queen turning pu"
+	Generated: eiettraoog libs rnk srtpaastttt saho  em slhfsw   eil et ei voa e rgnt or n hetmo iz eetwnad hee ssiuai hettigiganaioiruireth  e g trmr ean tmsa augh eanslkagen lnad  spd aneuu rfbg rt eo sdinsrstn l t r hhh  tnit rco r rndaeggfhygvruafeou he rs  icrcw  te dhgoaco grhsfthha a cnanl  l t hoks  ithmebew i nenntakrshx inihiehd skosl shtnreaiaoiccus it imudidlsdesuesa si eayowtnwsnt teultpoteoasoanneomotelf esftehtetsaltr mene  ataaln qrnasse  lthsswoshco s tr e eglrlocrwntosdtie mn wu wn  mertwi ei
+
+Sequence 120546
+	Prompt: "n her spectacles and began staring at the hatter who turned pale and fidgeted  give your evidence sa"
+	Generated:  asere  tpehgoesitthbtnl hieamadiorrfhw eneoutirtgheswsat ee  kt dh i  nl h soegie tsh engee h sn  mthe   tn i bt giser i  g gslo h wwt eeshmeo toos ieri smsssstafnin  i rihiioeuao eo othetsunoklw hhd  swe  aookdf rtceidcisthn odpssshe doeeoantitewi ibnlnrl a  tobtghfth  refit tit  aoy  pdhitleepito ik s  cutsusi c sf howeswaq fdn kr  oeotsosn k e  bceoeoe oh aletihelhstnrhlansdn sgeh lh t luchr bdeic odeetofdsa  ef sh fl  isohpyxs t aioe stnawaeirw  ie heo hartgtt  vtishtgrd oaedd tn be nthh c 
