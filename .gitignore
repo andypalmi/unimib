@@ -8,3 +8,6 @@
 **/code__esempi/
 **/*.DS_Store
 Supervised/00_exercises/lab_08/outputs/*.pth
+**/train/*
+**/valid/*
+**/test/*
