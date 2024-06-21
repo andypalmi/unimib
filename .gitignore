@@ -13,3 +13,5 @@ Supervised/00_exercises/lab_08/outputs/*.pth
 **/test/*
 **/saved_models/*
 **/.venv/*
+**/.venv311/*
+**/.venv3-12-1/*
