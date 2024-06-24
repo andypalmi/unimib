@@ -4,6 +4,7 @@
 *.csv
 *.tar
 *.zip
+*.tif
 **/code__examples/
 **/code__esempi/
 **/*.DS_Store
