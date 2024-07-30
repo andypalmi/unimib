@@ -3,7 +3,7 @@ from torch.nn import Module
 from torch.amp.grad_scaler import GradScaler
 from torch.optim.optimizer import Optimizer
 from torch import Tensor
-import torch 
+import torch
 
 def reshape_imgs_masks(imgs, masks):
     """
@@ -58,7 +58,7 @@ def train(
         iteration (int): The current iteration number.
         accumulation_steps (int, optional): The number of steps to accumulate gradients before performing optimization. Defaults to 1.
         use_amp (bool, optional): Whether to use automatic mixed precision training. Defaults to True.
-        tiles (bool, optional): Whether the images and masks are tiled. Defaults to False.
+        tiles (bool, optional): Whether the images and masks are tiled by the Dataset. Defaults to False.
 
     Returns:
         torch.Tensor: The updated training loss.
@@ -71,8 +71,10 @@ def train(
     if tiles:
         imgs, masks = reshape_imgs_masks(imgs, masks)
     else:
-        imgs, masks = imgs.to(device), masks.to(device)
-        masks = masks.to(torch.long)
+        with torch.profiler.record_function("Data to device"):
+            # TODO - Check if non_blocking=True is necessary
+            imgs, masks = imgs.to(device, non_blocking=True), masks.to(device, torch.int, non_blocking=True)
+            masks = masks.to(torch.long)
 
     optimizer.zero_grad()
 

@@ -118,45 +118,67 @@ criterion = nn.CrossEntropyLoss()
 optimizer = Adam(MODEL.parameters(), lr=1e-3)
 
 NUM_EPOCHS = 100
+TRAIN = True
 
-for epoch in range(NUM_EPOCHS):
-    MODEL.train()
-    train_loss = torch.tensor(0.0).to(DEVICE)
+if TRAIN:
+    for epoch in range(NUM_EPOCHS):
+        MODEL.train()
+        train_loss = torch.tensor(0.0).to(DEVICE)
 
-    if epoch == 0:
-        with torch.profiler.profile(
-            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-            schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
-            on_trace_ready=torch.profiler.tensorboard_trace_handler(logs_dir),
-            record_shapes=True, profile_memory=True, with_stack=True
-        ) as prof:
+        if epoch == 0:
+            with torch.profiler.profile(
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                schedule=torch.profiler.schedule(wait=5, warmup=1, active=2, repeat=1),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler(logs_dir),
+                record_shapes=True, profile_memory=True, with_stack=True
+            ) as prof:
+                for i, (imgs, masks) in enumerate(tqdm(train_loader, desc=f'Training Epoch {epoch+1}/{NUM_EPOCHS}')):
+                    train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, accumulation_steps, use_amp=True)                        
+                    # Profile each batch
+                    prof.step()
+                    if i > 25:
+                        cpu_time_table = prof.key_averages().table(sort_by="cpu_time_total", row_limit=20)
+                        cuda_time_table = prof.key_averages().table(sort_by="cuda_time_total", row_limit=20)
+
+                        # Save CPU time table to a text file
+                        with open(f'{logs_dir}/cpu_time_total.txt', 'w') as f:
+                            f.write(cpu_time_table)
+                            print(f'CPU time table saved to {logs_dir}/cpu_time_total.txt')
+
+                        # Save CUDA time table to a text file
+                        with open(f'{logs_dir}/cuda_time_total.txt', 'w') as f:
+                            f.write(cuda_time_table)
+                            print(f'CUDA time table saved to {logs_dir}/cuda_time_total.txt')
+
+                        break
+        else:
             for i, (imgs, masks) in enumerate(tqdm(train_loader, desc=f'Training Epoch {epoch+1}/{NUM_EPOCHS}')):
                 train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, accumulation_steps, use_amp=True)
-                # Profile each 2 batches
-                if i % 2 == 0:
-                    prof.step()
-    else:
-        for i, (imgs, masks) in enumerate(tqdm(train_loader, desc=f'Training Epoch {epoch+1}/{NUM_EPOCHS}')):
-            train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, accumulation_steps, use_amp=True)
+        
+        del train_loss
+        torch.cuda.empty_cache()
 
-    writer.close()
+        writer.close()
 
-    MODEL.eval()
-    val_loss = torch.tensor(0.0).to(DEVICE)
-    all_y_true = []
-    all_y_pred = []
+        MODEL.eval()
+        val_loss = torch.tensor(0.0).to(DEVICE)
+        all_y_true = []
+        all_y_pred = []
 
-    with torch.no_grad():
-        for imgs, masks in tqdm(val_loader, desc=f'Validation Epoch {epoch+1}/{NUM_EPOCHS}'):
-            val_loss, preds = validate(val_loss, imgs, masks, MODEL, criterion, use_amp=True)
-            all_y_true.append(masks.to(DEVICE))
-            all_y_pred.append(preds)
+        with torch.no_grad():
+            for imgs, masks in tqdm(val_loader, desc=f'Validation Epoch {epoch+1}/{NUM_EPOCHS}'):
+                val_loss, preds = validate(val_loss, imgs, masks, MODEL, criterion, use_amp=True)
+                all_y_true.append(masks.to(DEVICE))
+                all_y_pred.append(preds)
 
-    all_y_true = torch.cat(all_y_true, dim=0)
-    all_y_pred = torch.cat(all_y_pred, dim=0)
+        all_y_true = torch.cat(all_y_true, dim=0)
+        all_y_pred = torch.cat(all_y_pred, dim=0)
 
-    metrics = compute_metrics_torch(all_y_true, all_y_pred, num_classes, DEVICE)
+        metrics = compute_metrics_torch(all_y_true, all_y_pred, num_classes, DEVICE)
 
-    print(f'Validation Loss: {val_loss.item()/len(val_loader):.3f}, Mean IoU: {metrics["mean_iou"]:.3f}, '
-      f'Accuracy: {metrics["accuracy"]:.3f}, Dice Score: {metrics["mean_dice"]:.3f}, '
-      f'per-class IoU: {[f"Class {i}: {iou:.3f}" for i, iou in enumerate(metrics["per_class_iou"])]}')
+        del all_y_pred, all_y_true
+        torch.cuda.empty_cache()
+
+        print(f'Validation Loss: {val_loss.item()/len(val_loader):.3f}, Mean IoU: {metrics["mean_iou"]:.3f}, '
+        f'Accuracy: {metrics["accuracy"]:.3f}, Dice Score: {metrics["mean_dice"]:.3f}, '
+        f'per-class IoU: {[f"Class {i}: {iou:.3f}" for i, iou in enumerate(metrics["per_class_iou"])]}')
