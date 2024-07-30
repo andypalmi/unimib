@@ -52,7 +52,6 @@ val_split, test_split = train_test_split(valtest_split, test_size=0.5, random_st
 
 # Read class colors
 labels_colors, colors, num_classes = read_class_colors('data/class_dict_seg.csv')
-print(f'type of labels_colors: {type(labels_colors)}, type of colors: {type(colors)}, num_classes: {type(num_classes)}')
 
 # Get image and mask paths
 final_dim = 256
@@ -79,8 +78,7 @@ val_split, test_split = train_test_split(valtest_split, test_size=0.5, random_st
 train_ds = TilesDataset(train_split, transform=train_transform, tiles_dim=tiles_dim, tiles=False)
 val_ds = TilesDataset(val_split, transform=valtest_transform, tiles_dim=tiles_dim, tiles=False)
 test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_dim, tiles=False)
-
-print(f'Train dataset length: {len(train_ds)}, Val dataset length: {len(val_ds)}, Test dataset length: {len(test_ds)}')
+# print(f'Train dataset length: {len(train_ds)}, Val dataset length: {len(val_ds)}, Test dataset length: {len(test_ds)}')
 
 # Create the DataLoaders
 num_workers = 12
@@ -123,7 +121,7 @@ NUM_EPOCHS = 100
 
 for epoch in range(NUM_EPOCHS):
     MODEL.train()
-    train_loss = torch.tensor(0.0)
+    train_loss = torch.tensor(0.0).to(DEVICE)
 
     if epoch == 0:
         with torch.profiler.profile(
@@ -144,7 +142,7 @@ for epoch in range(NUM_EPOCHS):
     writer.close()
 
     MODEL.eval()
-    val_loss = torch.tensor(0.0)
+    val_loss = torch.tensor(0.0).to(DEVICE)
     all_y_true = []
     all_y_pred = []
 

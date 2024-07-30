@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torch.nn import Module
 from torch import Tensor
 from typing import Tuple
+import numpy as np
 
 def test(testloader: DataLoader, 
          model: Module, 
@@ -67,7 +68,7 @@ def test(testloader: DataLoader,
     return all_y_true_flattened, all_y_pred_flattened
 
 def convert_to_rgb(masks: Tensor,
-                   colors: Tensor, 
+                   colors: np.ndarray, 
                    device: str = 'cuda' if is_available() else 'cpu'
                    ) -> Tensor:
     """
@@ -90,7 +91,12 @@ def convert_to_rgb(masks: Tensor,
 
     return masks_rgb
     
-def visualize_predictions(true_masks, pred_masks, colors, dims=(256, 256), images_to_visualize=3, batch_size=1):
+def visualize_predictions(true_masks: Tensor, 
+                          pred_masks: Tensor, 
+                          colors: np.ndarray, 
+                          dims: Tuple[int, int] = (256, 256), 
+                          images_to_visualize: int = 3, 
+                          batch_size: int = 1) -> None:
     '''
     Visualize the predictions of a model.
 
