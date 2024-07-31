@@ -44,7 +44,6 @@ def train(
     optimizer: Optimizer,
     criterion: Module,
     iteration: int,
-    accumulation_steps: int = 1,
     use_amp: bool = True,
     tiles: bool = False
 ) -> Tensor:
@@ -60,7 +59,6 @@ def train(
         optimizer (torch.optim.Optimizer): The optimizer for updating model parameters.
         criterion (torch.nn.Module): The loss function.
         iteration (int): The current iteration number.
-        accumulation_steps (int, optional): The number of steps to accumulate gradients before performing optimization. Defaults to 1.
         use_amp (bool, optional): Whether to use automatic mixed precision training. Defaults to True.
         tiles (bool, optional): Whether the images and masks are tiled by the Dataset. Defaults to False.
 
@@ -87,10 +85,10 @@ def train(
         if use_amp:
             with autocast(device_type='cuda'):
                 outputs = model(imgs)
-                loss = criterion(outputs, masks) / accumulation_steps
+                loss = criterion(outputs, masks)
         else:
             outputs = model(imgs)
-            loss = criterion(outputs, masks) / accumulation_steps
+            loss = criterion(outputs, masks)
 
     with torch.profiler.record_function("Training Backward pass"):
         if use_amp:
@@ -98,19 +96,15 @@ def train(
         else:
             loss.backward()
 
-    if (iteration + 1) % accumulation_steps == 0:
-        with torch.profiler.record_function("Training Optimizer step"):
-            if use_amp:
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                optimizer.step()
-            optimizer.zero_grad()
+    with torch.profiler.record_function("Training Optimizer step"):
+        if use_amp:
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            optimizer.step()
+        optimizer.zero_grad()
 
-    train_loss += loss.detach() * accumulation_steps  # Adjust for scaled loss
-
-    if (iteration + 1) % 64 == 0:
-        print(f'Train loss at iteration {iteration + 1}: {train_loss.item() / iteration :.3f}')
+    train_loss += loss.detach()
 
     return train_loss
 
@@ -233,8 +227,8 @@ def save_model_stats(
     stats = {
         'arch': config['arch'],
         'encoder_name': config['encoder_name'],
-        'train_loss': train_loss,
-        'val_loss': val_loss,
+        'train_loss': round(train_loss, 4),
+        'val_loss': round(val_loss, 4),
         'epoch': epoch,
         'final_dim': final_dim,
         'tiles_dim': tiles_dim,
