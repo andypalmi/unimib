@@ -23,6 +23,8 @@ from utils.TilesDataset import TilesDataset
 from utils.transforms import train_transform, valtest_transform
 from utils.metrics import compute_metrics_torch
 from utils.train import train, validate
+from utils.utils import save_profiling_tables
+from utils.train import save_model, save_model_stats, read_csv_with_empty_handling
 
 # Set the current working directory to the directory where main.py is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -84,9 +86,13 @@ test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_
 num_workers = 12
 batch_size_train = 75
 batch_size_valtest = 75
-train_loader = DataLoader(train_ds, batch_size=batch_size_train, shuffle=True, pin_memory=False, num_workers=num_workers)
-val_loader = DataLoader(val_ds, batch_size=batch_size_valtest, shuffle=False, pin_memory=False, num_workers=num_workers)
-test_loader = DataLoader(test_ds, batch_size=batch_size_valtest, shuffle=False, pin_memory=False, num_workers=num_workers)
+dataloader_kwargs = {'shuffle' : True, 'pin_memory' : True, 'num_workers' : num_workers, 'persistent_workers' : True, 'prefetch_factor' : 5, 'pin_memory_device' : 'cuda' if torch.cuda.is_available() else 'cpu'}
+train_kwargs = {'batch_size' : batch_size_train, **dataloader_kwargs}
+valtest_kwargs = {'batch_size' : batch_size_valtest, **dataloader_kwargs}
+print(f'train_kwargs = {train_kwargs}, valtest_kwargs = {valtest_kwargs}')
+train_loader = DataLoader(train_ds, **train_kwargs)
+val_loader = DataLoader(val_ds, **valtest_kwargs)
+test_loader = DataLoader(test_ds, **valtest_kwargs)
 
 config = {
     'arch': 'unet',
@@ -117,13 +123,21 @@ MODEL.to(DEVICE)
 criterion = nn.CrossEntropyLoss()
 optimizer = Adam(MODEL.parameters(), lr=1e-3)
 
-NUM_EPOCHS = 100
+NUM_EPOCHS = 25
 TRAIN = True
 
 if TRAIN:
+    best_val_loss = float('inf')
+    best_model_stats = read_csv_with_empty_handling('models/best_model_stats.csv')
+    try:
+        best_val_loss = best_model_stats['val_loss'].values[0]
+    except IndexError:
+        best_val_loss = torch.tensor(float('inf')).to(DEVICE)
+    print(f'Best Validation Loss: {best_val_loss}')
+
     for epoch in range(NUM_EPOCHS):
         MODEL.train()
-        train_loss = torch.tensor(0.0).to(DEVICE)
+        train_loss = torch.tensor(0.0).to(DEVICE)        
 
         if epoch == 0:
             with torch.profiler.profile(
@@ -137,25 +151,13 @@ if TRAIN:
                     # Profile each batch
                     prof.step()
                     if i > 25:
-                        cpu_time_table = prof.key_averages().table(sort_by="cpu_time_total", row_limit=20)
-                        cuda_time_table = prof.key_averages().table(sort_by="cuda_time_total", row_limit=20)
-
-                        # Save CPU time table to a text file
-                        with open(f'{logs_dir}/cpu_time_total.txt', 'w') as f:
-                            f.write(cpu_time_table)
-                            print(f'CPU time table saved to {logs_dir}/cpu_time_total.txt')
-
-                        # Save CUDA time table to a text file
-                        with open(f'{logs_dir}/cuda_time_total.txt', 'w') as f:
-                            f.write(cuda_time_table)
-                            print(f'CUDA time table saved to {logs_dir}/cuda_time_total.txt')
-
+                        save_profiling_tables(prof, logs_dir)
                         break
         else:
             for i, (imgs, masks) in enumerate(tqdm(train_loader, desc=f'Training Epoch {epoch+1}/{NUM_EPOCHS}')):
                 train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, accumulation_steps, use_amp=True)
         
-        del train_loss
+        train_loss = train_loss.item()/len(train_loader)
         torch.cuda.empty_cache()
 
         writer.close()
@@ -179,6 +181,14 @@ if TRAIN:
         del all_y_pred, all_y_true
         torch.cuda.empty_cache()
 
-        print(f'Validation Loss: {val_loss.item()/len(val_loader):.3f}, Mean IoU: {metrics["mean_iou"]:.3f}, '
+        val_loss = val_loss.item()/len(val_loader)
+
+        print(f'Validation Loss: {val_loss:.3f}, Mean IoU: {metrics["mean_iou"]:.3f}, '
         f'Accuracy: {metrics["accuracy"]:.3f}, Dice Score: {metrics["mean_dice"]:.3f}, '
         f'per-class IoU: {[f"Class {i}: {iou:.3f}" for i, iou in enumerate(metrics["per_class_iou"])]}')
+
+        if val_loss < best_val_loss:
+            is_best = True
+            best_val_loss = val_loss
+            model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, config, final_dim, tiles_dim, is_best=is_best)
+            save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=is_best)

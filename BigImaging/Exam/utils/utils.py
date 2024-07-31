@@ -34,3 +34,24 @@ def read_class_colors(
         print(f'Number of classes: {nr_classes}')
 
     return labels_colors, colors, nr_classes
+
+def save_profiling_tables(prof, logs_dir):
+    """
+    Save CPU and CUDA time tables from the profiler to text files.
+
+    Args:
+        prof: The profiler object containing the profiling data.
+        logs_dir: The directory where the log files will be saved.
+    """
+    cpu_time_table = prof.key_averages().table(sort_by="cpu_time_total", row_limit=20)
+    cuda_time_table = prof.key_averages().table(sort_by="cuda_time_total", row_limit=20)
+
+    # Save CPU time table to a text file
+    with open(f'{logs_dir}/cpu_time_total.txt', 'w') as f:
+        f.write(cpu_time_table)
+        print(f'CPU time table saved to {logs_dir}/cpu_time_total.txt')
+
+    # Save CUDA time table to a text file
+    with open(f'{logs_dir}/cuda_time_total.txt', 'w') as f:
+        f.write(cuda_time_table)
+        print(f'CUDA time table saved to {logs_dir}/cuda_time_total.txt')

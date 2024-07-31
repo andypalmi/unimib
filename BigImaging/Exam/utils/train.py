@@ -4,6 +4,10 @@ from torch.amp.grad_scaler import GradScaler
 from torch.optim.optimizer import Optimizer
 from torch import Tensor
 import torch
+import os
+import csv
+import glob
+import pandas as pd
 
 def reshape_imgs_masks(imgs, masks):
     """
@@ -69,32 +73,39 @@ def train(
     # Only reshape images and masks if tiles are being computed by the Dataset class
     # Else the source is the already tiled images and masks
     if tiles:
-        imgs, masks = reshape_imgs_masks(imgs, masks)
+        with torch.profiler.record_function("Reshaping images and masks"):
+            imgs, masks = reshape_imgs_masks(imgs, masks)
     else:
-        with torch.profiler.record_function("Data to device"):
+        with torch.profiler.record_function("Transferring images and masks to device"):
             # TODO - Check if non_blocking=True is necessary
-            imgs, masks = imgs.to(device, non_blocking=True), masks.to(device, torch.int, non_blocking=True)
+            imgs, masks = imgs.to(device, non_blocking=True), masks.to(device, torch.long, non_blocking=True)
             masks = masks.to(torch.long)
 
     optimizer.zero_grad()
 
-    if use_amp:
-        with autocast(device_type='cuda'):
+    with torch.profiler.record_function("Train Forward pass"):
+        if use_amp:
+            with autocast(device_type='cuda'):
+                outputs = model(imgs)
+                loss = criterion(outputs, masks) / accumulation_steps
+        else:
             outputs = model(imgs)
             loss = criterion(outputs, masks) / accumulation_steps
-        scaler.scale(loss).backward()
-    else:
-        outputs = model(imgs)
-        loss = criterion(outputs, masks) / accumulation_steps
-        loss.backward()
+
+    with torch.profiler.record_function("Training Backward pass"):
+        if use_amp:
+            scaler.scale(loss).backward()
+        else:
+            loss.backward()
 
     if (iteration + 1) % accumulation_steps == 0:
-        if use_amp:
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            optimizer.step()
-        optimizer.zero_grad()
+        with torch.profiler.record_function("Training Optimizer step"):
+            if use_amp:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
+            optimizer.zero_grad()
 
     train_loss += loss.detach() * accumulation_steps  # Adjust for scaled loss
 
@@ -134,8 +145,7 @@ def validate(
         if tiles:
             imgs, masks = reshape_imgs_masks(imgs, masks)
         else:
-            imgs, masks = imgs.to(device), masks.to(device)
-            masks = masks.to(torch.long)
+            imgs, masks = imgs.to(device, non_blocking=True), masks.to(device, torch.long, non_blocking=True)
 
         if use_amp:
             with autocast(device_type='cuda'):
@@ -151,3 +161,116 @@ def validate(
 
     return val_loss, preds
 
+def save_model(
+    model: Module,
+    train_loss: float,
+    val_loss: float,
+    optimizer: Optimizer,
+    epoch: int,
+    config: dict,
+    final_dim: int,
+    tiles_dim: int,
+    save_path: str = 'models/',
+    is_best: bool = False
+) -> str:
+    """
+    Save the model and optimizer state dictionaries to disk.
+    If is_best is True, save it as the best model.
+    If epoch > 0, delete the previous model with the same configuration.
+    """
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    model_name = f'model_epoch_{epoch}_final_dim_{final_dim}_tiles_dim_{tiles_dim}_val_loss_{val_loss:.4f}_train_loss_{train_loss:.4f}_arch_{config["arch"]}_encoder_name_{config["encoder_name"]}.pt'
+    
+    if is_best:
+        model_dir = os.path.join(save_path, 'best', model_name)
+    else:
+        model_dir = os.path.join(save_path, model_name)
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(model_dir), exist_ok=True)
+
+    # If epoch > 0, delete the previous model with the same configuration
+    if epoch > 0 and not is_best:
+        previous_model_pattern = os.path.join(save_path, f'model_epoch_*_final_dim_{final_dim}_tiles_dim_{tiles_dim}_*_arch_{config["arch"]}_encoder_name_{config["encoder_name"]}.pt')
+        for file in glob.glob(previous_model_pattern):
+            os.remove(file)
+            print(f"Deleted previous model: {file}")
+
+    torch.save(
+        {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'config': config,
+            'final_dim': final_dim,
+            'tiles_dim': tiles_dim,
+            'train_loss': train_loss,
+            'val_loss': val_loss
+        },
+        model_dir
+    )
+
+    print(f'{"Saving best model" if is_best else "Saving model"} to {model_dir}')
+    return model_dir
+
+def save_model_stats(
+    train_loss: float,
+    val_loss: float,
+    epoch: int,
+    config: dict,
+    logs_dir: str,
+    model_dir: str,
+    final_dim: int,
+    tiles_dim: int,
+    is_best: bool = False
+) -> None:
+    """
+    Save the training and validation loss to disk.
+    If is_best is True, save it as the best model stats.
+    """
+    stats = {
+        'arch': config['arch'],
+        'encoder_name': config['encoder_name'],
+        'train_loss': train_loss,
+        'val_loss': val_loss,
+        'epoch': epoch,
+        'final_dim': final_dim,
+        'tiles_dim': tiles_dim,
+        'logs_dir': logs_dir,
+        'model_dir': model_dir,
+    }
+
+    if is_best:
+        stats_file = 'models/best_model_stats.csv'
+        mode = 'w'  # Overwrite for best model stats
+    else:
+        stats_file = 'models/model_stats.csv'
+        mode = 'a'  # Append for regular model stats
+
+    with open(stats_file, mode, newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=stats.keys())
+        if file.tell() == 0 or is_best:
+            writer.writeheader()
+        writer.writerow(stats)
+
+    print(f'{"Saving best model stats" if is_best else "Updating model stats"} in {stats_file}')
+
+    # If saving best model stats, also update the regular model stats to include the best new model
+    if is_best:
+        save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=False)
+
+# Function to read the CSV file and handle empty file case
+def read_csv_with_empty_handling(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        if df.empty:
+            print(f"The file {file_path} is empty.")
+        return df
+    except pd.errors.EmptyDataError:
+        print(f"The file {file_path} is empty or does not exist.")
+        return pd.DataFrame(columns=[
+            'arch', 'encoder_name', 'train_loss', 'val_loss', 'epoch',
+            'final_dim', 'tiles_dim', 'logs_dir', 'model_dir'
+        ])
