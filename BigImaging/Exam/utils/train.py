@@ -223,6 +223,7 @@ def save_model_stats(
     """
     Save the training and validation loss to disk.
     If is_best is True, save it as the best model stats.
+    Overwrite the line with the same configuration, else add a new line.
     """
     stats = {
         'arch': config['arch'],
@@ -237,17 +238,33 @@ def save_model_stats(
     }
 
     if is_best:
-        stats_file = 'models/best_model_stats.csv'
+        stats_file = 'best_model_stats.csv'
         mode = 'w'  # Overwrite for best model stats
     else:
-        stats_file = 'models/model_stats.csv'
-        mode = 'a'  # Append for regular model stats
+        stats_file = 'model_stats.csv'
+        mode = 'a+'  # Append+ for regular model stats (allows reading and writing)
 
-    with open(stats_file, mode, newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=stats.keys())
-        if file.tell() == 0 or is_best:
-            writer.writeheader()
-        writer.writerow(stats)
+    # Read existing data
+    existing_data = read_csv_with_empty_handling(stats_file)
+
+    # Check if a row with the same configuration exists
+    same_config = existing_data[
+        (existing_data['arch'] == stats['arch']) &
+        (existing_data['encoder_name'] == stats['encoder_name']) &
+        (existing_data['final_dim'] == stats['final_dim']) &
+        (existing_data['tiles_dim'] == stats['tiles_dim'])
+    ]
+
+    if not same_config.empty and is_best:
+        # Update the existing row
+        for key, value in stats.items():
+            existing_data.loc[same_config.index[0], key] = value
+    else:
+        # Append a new row
+        existing_data = pd.concat([existing_data, pd.DataFrame([stats])], ignore_index=True)
+
+    # Write the updated data back to the CSV file
+    existing_data.to_csv(stats_file, index=False)
 
     print(f'{"Saving best model stats" if is_best else "Updating model stats"} in {stats_file}')
 
@@ -268,3 +285,40 @@ def read_csv_with_empty_handling(file_path):
             'arch', 'encoder_name', 'train_loss', 'val_loss', 'epoch',
             'final_dim', 'tiles_dim', 'logs_dir', 'model_dir'
         ])
+    
+def initialize_best_val_loss(final_dim: int, tiles_dim: int, config: dict, device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> float:
+    """
+    Initialize the best validation loss from the best model stats CSV file.
+    
+    Args:
+        final_dim (int): The final dimension of the images.
+        tiles_dim (int): The dimension of the tiles.
+        config (dict): The configuration dictionary containing 'arch' and 'encoder_name'.
+        device (str): The device to use. Defaults to 'cuda' if available, else 'cpu'.
+    
+    Returns:
+        float: The best validation loss.
+    """
+    best_val_loss = float('inf')
+    
+    # Read the best model stats from the CSV file
+    best_model_stats = read_csv_with_empty_handling('best_model_stats.csv')
+    
+    # Filter the stats for the same configuration
+    same_config_stats = best_model_stats[
+        (best_model_stats['arch'] == config['arch']) &
+        (best_model_stats['encoder_name'] == config['encoder_name']) &
+        (best_model_stats['final_dim'] == final_dim) &
+        (best_model_stats['tiles_dim'] == tiles_dim)
+    ]
+    
+    try:
+        # Try to get the best validation loss from the stats
+        best_val_loss = same_config_stats['val_loss'].values[0]
+        print(f'Loaded Best Validation Loss: {best_val_loss}')
+    except IndexError:
+        # If no stats exist, set best_val_loss to infinity
+        best_val_loss = torch.tensor(float('inf')).to(device).item()
+        print(f'No Best Validation Loss found for configuration {config['arch']} {config['encoder_name']} with final_dim {final_dim} and tiles_dim {tiles_dim}.')
+    
+    return best_val_loss

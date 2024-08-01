@@ -8,25 +8,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print("Current working directory set to:", os.getcwd())
 
-# Define the columns based on the stats dictionary
-columns = [
-    'arch', 'encoder_name', 'train_loss', 'val_loss', 'epoch',
-    'final_dim', 'tiles_dim', 'logs_dir', 'model_dir'
-]
-
-# Create a placeholder CSV file
-placeholder_file = 'models/best_model_stats.csv'
-with open(placeholder_file, 'w', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=columns)
-    writer.writeheader()
-
-placeholder_file = 'models/model_stats.csv'
-with open(placeholder_file, 'w', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=columns)
-    writer.writeheader()
-
 # Load the CSV file
-best_model_stats = pd.read_csv('models/best_model_stats.csv')
+best_model_stats = pd.read_csv('best_model_stats.csv')
 
 # Print the columns to inspect them
 print("Columns in DataFrame:", best_model_stats.columns)
@@ -40,3 +23,7 @@ try:
     print(f"Best Validation Loss: {best_val_loss}")
 except KeyError:
     print("Error: 'val_loss' column not found in the DataFrame.")
+
+from utils.train import save_model_stats
+
+save_model_stats(0.373, 0.3522, 22, {'arch': 'unet', 'encoder_name': 'resnet34'}, '/home/andrea/Documents/unimib/BigImaging/Exam/logs/unet/resnet34/tiles_256/512x512/2024-07-31_15-42-22', ',models/best/model_epoch_22_final_dim_256_tiles_dim_512_val_loss_0.3522_train_loss_0.3730_arch_unet_encoder_name_resnet34.pt', 256, 000000, is_best=True)
