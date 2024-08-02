@@ -169,8 +169,8 @@ def save_model(
 ) -> str:
     """
     Save the model and optimizer state dictionaries to disk.
-    If is_best is True, save it as the best model.
-    If epoch > 0, delete the previous model with the same configuration.
+    If is_best is True, save it as the best model in 'models/best/'.
+    Delete the previous model with the same configuration.
     """
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -185,12 +185,11 @@ def save_model(
     # Ensure the directory exists
     os.makedirs(os.path.dirname(model_dir), exist_ok=True)
 
-    # If epoch > 0, delete the previous model with the same configuration
-    if epoch > 0 and not is_best:
-        previous_model_pattern = os.path.join(save_path, f'model_epoch_*_final_dim_{final_dim}_tiles_dim_{tiles_dim}_*_arch_{config["arch"]}_encoder_name_{config["encoder_name"]}.pt')
-        for file in glob.glob(previous_model_pattern):
-            os.remove(file)
-            print(f"Deleted previous model: {file}")
+    # Delete the previous model with the same configuration
+    previous_model_pattern = os.path.join(save_path, f'{"best/" if is_best else ""}model_epoch_*_final_dim_{final_dim}_tiles_dim_{tiles_dim}_*_arch_{config["arch"]}_encoder_name_{config["encoder_name"]}.pt')
+    for file in glob.glob(previous_model_pattern):
+        os.remove(file)
+        print(f"Deleted previous model: {file}")
 
     torch.save(
         {
@@ -222,8 +221,8 @@ def save_model_stats(
 ) -> None:
     """
     Save the training and validation loss to disk.
-    If is_best is True, save it as the best model stats.
-    Overwrite the line with the same configuration, else add a new line.
+    If is_best is True, update the best model stats.
+    Always update the regular model stats.
     """
     stats = {
         'arch': config['arch'],
@@ -237,15 +236,25 @@ def save_model_stats(
         'model_dir': model_dir,
     }
 
+    # Update best model stats if it's the best model
     if is_best:
-        stats_file = 'best_model_stats.csv'
-        mode = 'w'  # Overwrite for best model stats
-    else:
-        stats_file = 'model_stats.csv'
-        mode = 'a+'  # Append+ for regular model stats (allows reading and writing)
+        best_stats_file = 'best_model_stats.csv'
+        update_stats_file(best_stats_file, stats, overwrite=True)
+        print(f'Updated best model stats in {best_stats_file}')
 
+    # Always update regular model stats
+    regular_stats_file = 'model_stats.csv'
+    update_stats_file(regular_stats_file, stats, overwrite=False)
+    print(f'Updated model stats in {regular_stats_file}')
+
+def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> None:
+    """
+    Update the stats file with the given stats.
+    If overwrite is True, replace the existing row for the same configuration.
+    Otherwise, append a new row.
+    """
     # Read existing data
-    existing_data = read_csv_with_empty_handling(stats_file)
+    existing_data = read_csv_with_empty_handling(file_path)
 
     # Check if a row with the same configuration exists
     same_config = existing_data[
@@ -255,7 +264,7 @@ def save_model_stats(
         (existing_data['tiles_dim'] == stats['tiles_dim'])
     ]
 
-    if not same_config.empty and is_best:
+    if not same_config.empty and overwrite:
         # Update the existing row
         for key, value in stats.items():
             existing_data.loc[same_config.index[0], key] = value
@@ -264,15 +273,8 @@ def save_model_stats(
         existing_data = pd.concat([existing_data, pd.DataFrame([stats])], ignore_index=True)
 
     # Write the updated data back to the CSV file
-    existing_data.to_csv(stats_file, index=False)
+    existing_data.to_csv(file_path, index=False)
 
-    print(f'{"Saving best model stats" if is_best else "Updating model stats"} in {stats_file}')
-
-    # If saving best model stats, also update the regular model stats to include the best new model
-    if is_best:
-        save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=False)
-
-# Function to read the CSV file and handle empty file case
 def read_csv_with_empty_handling(file_path):
     try:
         df = pd.read_csv(file_path)

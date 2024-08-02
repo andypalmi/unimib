@@ -104,7 +104,7 @@ config = {
 # Create the model
 MODEL = smp.create_model(**config)
 
-# Create a TensorBoard callback
+# Create a TensorBoard writer
 logs_dir = f'logs/{config["arch"]}/{config["encoder_name"]}/tiles_{final_dim}/{tiles_dim}x{tiles_dim}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
 os.makedirs(logs_dir, exist_ok=True)  # Ensure the logs directory exists
 logs_dir = os.path.abspath(logs_dir)  # Get full path to the logs directory
@@ -118,10 +118,17 @@ accumulation_steps = 1
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MODEL.to(DEVICE)
 criterion = nn.CrossEntropyLoss()
-optimizer = Adam(MODEL.parameters(), lr=1e-4)
+optimizer = Adam(MODEL.parameters(), lr=5e-3)
 NUM_EPOCHS = 50
 TRAIN = True
 PROFILE = False
+
+# Early stopping parameters
+PATIENCE = 10
+early_stopping_counter = 0
+
+# Learning rate scheduler
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
 
 if TRAIN:
     # Initialize best validation loss
@@ -174,9 +181,8 @@ if TRAIN:
         # Calculate average training loss
         train_loss = train_loss.item() / len(train_loader)
         
-        # Clear CUDA cache and close TensorBoard writer
+        # Clear CUDA cache
         torch.cuda.empty_cache()
-        writer.close()
 
         # Set model to evaluation mode
         MODEL.eval()
@@ -213,22 +219,43 @@ if TRAIN:
               f'Accuracy: {metrics["accuracy"]:.3f}, Dice Score: {metrics["mean_dice"]:.3f}, '
               f'\nper-class IoU: {[f"Class {i}: {iou:.3f}" for i, iou in enumerate(metrics["per_class_iou"])]} \n')
 
+        # Log metrics to Tensorboard
+        writer.add_scalar('Loss/train', train_loss, epoch)
+        writer.add_scalar('Loss/val', val_loss, epoch)
+        writer.add_scalar('Metrics/accuracy', metrics["accuracy"], epoch)
+        writer.add_scalar('Metrics/mean_dice', metrics["mean_dice"], epoch)
+        writer.add_scalar('Metrics/mean_iou', metrics["mean_iou"], epoch)
+        writer.add_scalar('LR', scheduler.get_last_lr()[0], epoch)
+
         # Check if this is the best model so far
         if val_loss < best_val_loss:
             is_best = True
             best_val_loss = val_loss
+            early_stopping_counter = 0
             
             # Save the model and its stats
             model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, config, final_dim, tiles_dim, is_best=is_best)
             save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=is_best)
         else:
             is_best = False
+            early_stopping_counter += 1
 
             # Save the model and its stats
             model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, config, final_dim, tiles_dim, is_best=is_best)
             save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=is_best)
 
+        # Early stopping check
+        if early_stopping_counter >= PATIENCE:
+            print(f"Early stopping triggered. No improvement for {PATIENCE} epochs.")
+            break
+
+        # Step the learning rate scheduler
+        scheduler.step()
+
         # Free up memory
         del all_y_pred, all_y_true
         del val_loss, train_loss
         torch.cuda.empty_cache()
+
+    # Close Tensorboard writer
+    writer.close()
