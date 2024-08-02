@@ -161,6 +161,7 @@ def save_model(
     val_loss: float,
     optimizer: Optimizer,
     epoch: int,
+    learning_rate: float,
     config: dict,
     final_dim: int,
     tiles_dim: int,
@@ -196,6 +197,7 @@ def save_model(
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
+            'learning_rate': learning_rate,
             'config': config,
             'final_dim': final_dim,
             'tiles_dim': tiles_dim,
@@ -212,6 +214,7 @@ def save_model_stats(
     train_loss: float,
     val_loss: float,
     epoch: int,
+    learning_rate: float,
     config: dict,
     logs_dir: str,
     model_dir: str,
@@ -230,6 +233,7 @@ def save_model_stats(
         'train_loss': round(train_loss, 4),
         'val_loss': round(val_loss, 4),
         'epoch': epoch,
+        'learning_rate': learning_rate,
         'final_dim': final_dim,
         'tiles_dim': tiles_dim,
         'logs_dir': logs_dir,
@@ -284,8 +288,8 @@ def read_csv_with_empty_handling(file_path):
     except pd.errors.EmptyDataError:
         print(f"The file {file_path} is empty or does not exist.")
         return pd.DataFrame(columns=[
-            'arch', 'encoder_name', 'train_loss', 'val_loss', 'epoch',
-            'final_dim', 'tiles_dim', 'logs_dir', 'model_dir'
+            'arch', 'encoder_name', 'train_loss', 'val_loss', 'epoch', 
+            'learning_rate', 'final_dim', 'tiles_dim', 'logs_dir', 'model_dir'
         ])
     
 def initialize_best_val_loss(final_dim: int, tiles_dim: int, config: dict, device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> float:

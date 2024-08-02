@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from torch.profiler import ProfilerActivity
 from torch.optim.adam import Adam
+from torch.optim.adamw import AdamW
 
 from torch.utils.tensorboard.writer import SummaryWriter
 from datetime import datetime
@@ -95,6 +96,7 @@ test_loader = DataLoader(test_ds, **valtest_kwargs)
 # Define model configuration
 config = {
     'arch': 'DeepLabV3Plus',
+    # 'encoder_name': 'efficientnet-b5',
     'encoder_name': 'resnet34',
     'encoder_weights': 'imagenet',
     'in_channels': 3,
@@ -118,21 +120,24 @@ accumulation_steps = 1
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MODEL.to(DEVICE)
 criterion = nn.CrossEntropyLoss()
-optimizer = Adam(MODEL.parameters(), lr=5e-3)
-NUM_EPOCHS = 50
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-4
+optimizer = AdamW(MODEL.parameters(), lr=LEARNING_RATE)
+NUM_EPOCHS = 100
 TRAIN = True
 PROFILE = False
 
 # Early stopping parameters
-PATIENCE = 10
+PATIENCE = 13
 early_stopping_counter = 0
 
 # Learning rate scheduler
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=25)
 
 if TRAIN:
     # Initialize best validation loss
     best_val_loss = initialize_best_val_loss(final_dim, tiles_dim, config)
+    current_best_val_loss = torch.tensor(float('inf')).to(DEVICE)
 
     # Start the training loop
     for epoch in range(NUM_EPOCHS):
@@ -227,22 +232,23 @@ if TRAIN:
         writer.add_scalar('Metrics/mean_iou', metrics["mean_iou"], epoch)
         writer.add_scalar('LR', scheduler.get_last_lr()[0], epoch)
 
-        # Check if this is the best model so far
+        # Check if this is the best model so far (across all runs)
         if val_loss < best_val_loss:
-            is_best = True
             best_val_loss = val_loss
-            early_stopping_counter = 0
-            
-            # Save the model and its stats
-            model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, config, final_dim, tiles_dim, is_best=is_best)
-            save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=is_best)
+            is_best = True
         else:
             is_best = False
+
+        # Check if this is the best model so far (for current run)
+        if val_loss < current_best_val_loss:
+            current_best_val_loss = val_loss
+            early_stopping_counter = 0
+        else:
             early_stopping_counter += 1
 
-            # Save the model and its stats
-            model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, config, final_dim, tiles_dim, is_best=is_best)
-            save_model_stats(train_loss, val_loss, epoch, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=is_best)
+        # Save the model and its stats
+        model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, LEARNING_RATE, config, final_dim, tiles_dim, is_best=is_best)
+        save_model_stats(train_loss, val_loss, epoch, LEARNING_RATE, config, logs_dir, model_dir, final_dim, tiles_dim, is_best=is_best)
 
         # Early stopping check
         if early_stopping_counter >= PATIENCE:
