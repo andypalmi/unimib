@@ -276,6 +276,10 @@ def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> N
         # Append a new row
         existing_data = pd.concat([existing_data, pd.DataFrame([stats])], ignore_index=True)
 
+    if overwrite:
+        print(f'Found {len(same_config)} existing rows with the same configuration in {file_path}'
+            f'\n {'Updated existing row' if not same_config.empty and overwrite else "Appended new row"} in {file_path}')
+
     # Write the updated data back to the CSV file
     existing_data.to_csv(file_path, index=False)
 

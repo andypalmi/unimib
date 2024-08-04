@@ -80,8 +80,8 @@ test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_
 
 # Create the DataLoaders
 num_workers = 12
-batch_size_train = 85
-batch_size_valtest = 75
+batch_size_train = 20
+batch_size_valtest = 20
 dataloader_kwargs = {'shuffle': True, 'pin_memory': True, 'num_workers': num_workers, 
                      'persistent_workers': True, 'prefetch_factor': 5, 
                      'pin_memory_device': 'cuda' if torch.cuda.is_available() else 'cpu'}
@@ -96,8 +96,9 @@ test_loader = DataLoader(test_ds, **valtest_kwargs)
 # Define model configuration
 config = {
     'arch': 'DeepLabV3Plus',
-    # 'encoder_name': 'efficientnet-b5',
-    'encoder_name': 'resnet34',
+    'encoder_name': 'efficientnet-b5',
+    # 'encoder_name': 'resnet34',
+    # 'encoder_name': 'mobilenet_v2',
     'encoder_weights': 'imagenet',
     'in_channels': 3,
     'classes': num_classes
@@ -128,11 +129,11 @@ TRAIN = True
 PROFILE = False
 
 # Early stopping parameters
-PATIENCE = 13
+PATIENCE = 16
 early_stopping_counter = 0
 
 # Learning rate scheduler
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=25)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50)
 
 if TRAIN:
     # Initialize best validation loss
