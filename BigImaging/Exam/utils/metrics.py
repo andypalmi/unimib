@@ -20,10 +20,10 @@ def compute_metrics_torch(
 
     Returns:
         dict: A dictionary containing the computed metrics.
-            - 'mean_iou' (float): Mean Intersection over Union (IoU) score.
+            - 'weighted_mean_iou' (float): Weighted Mean Intersection over Union (IoU) score.
             - 'per_class_iou' (list): IoU score for each class.
             - 'accuracy' (float): Overall accuracy.
-            - 'mean_dice' (float): Mean Dice score.
+            - 'weighted_mean_dice' (float): Weighted Mean Dice score.
             - 'per_class_dice' (list): Dice score for each class.
     """
     
@@ -38,31 +38,43 @@ def compute_metrics_torch(
     # Compute overall accuracy
     acc = (y_true_flat == y_pred_flat).float().mean().item()
 
-    # Helper function to compute IoU for a single class
-    def compute_iou(cls):
+    # Initialize lists to store per-class metrics
+    iou_list = []
+    dice_list = []
+    class_frequencies = []
+
+    for cls in range(num_classes):
+        # Compute intersection and union for IoU
         intersection = ((y_true_flat == cls) & (y_pred_flat == cls)).float().sum().item()
         union = ((y_true_flat == cls) | (y_pred_flat == cls)).float().sum().item()
-        return intersection / union if union != 0 else 0
+        iou = intersection / union if union != 0 else 0
+        iou_list.append(iou)
 
-    # Helper function to compute Dice score for a single class
-    def compute_dice(cls):
-        intersection = 2 * ((y_true_flat == cls) & (y_pred_flat == cls)).float().sum().item()
+        # Compute intersection and total for Dice
+        dice_intersection = 2 * intersection
         total = (y_true_flat == cls).float().sum().item() + (y_pred_flat == cls).float().sum().item()
-        return intersection / total if total != 0 else 0
+        dice = dice_intersection / total if total != 0 else 0
+        dice_list.append(dice)
 
-    # Compute IoU
-    iou_list = [compute_iou(cls) for cls in range(num_classes)]
-    mean_iou = np.mean(iou_list)
+        # Compute class frequency
+        class_frequency = (y_true_flat == cls).float().sum().item()
+        class_frequencies.append(class_frequency)
 
-    # Compute Dice
-    dice_list = [compute_dice(cls) for cls in range(num_classes)]
-    mean_dice = np.mean(dice_list)
+    # Compute total number of pixels
+    total_pixels = y_true_flat.size(0)
+    class_weights = [freq / total_pixels for freq in class_frequencies]
+
+    # Compute weighted mean IoU
+    weighted_mean_iou = np.sum([iou * weight for iou, weight in zip(iou_list, class_weights)])
+
+    # Compute weighted mean Dice
+    weighted_mean_dice = np.sum([dice * weight for dice, weight in zip(dice_list, class_weights)])
 
     # Return the metrics
     return {
-        'mean_iou': mean_iou,
+        'weighted_mean_iou': weighted_mean_iou,
         'per_class_iou': iou_list,
         'accuracy': acc,
-        'mean_dice': mean_dice,
+        'weighted_mean_dice': weighted_mean_dice,
         'per_class_dice': dice_list
     }

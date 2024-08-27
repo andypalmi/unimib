@@ -106,6 +106,9 @@ def train(
 
     train_loss += loss.detach()
 
+    # Free CUDA memory after batch processing
+    del imgs, masks, outputs, loss
+
     return train_loss
 
 def validate(
@@ -274,7 +277,11 @@ def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> N
             existing_data.loc[same_config.index[0], key] = value
     else:
         # Append a new row
-        existing_data = pd.concat([existing_data, pd.DataFrame([stats])], ignore_index=True)
+        new_data = pd.DataFrame([stats])
+        if existing_data.empty:
+            existing_data = new_data
+        else:
+            existing_data = pd.concat([existing_data, new_data], ignore_index=True)
 
     if overwrite:
         print(f'Found {len(same_config)} existing rows with the same configuration in {file_path}'

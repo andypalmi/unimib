@@ -1,6 +1,38 @@
 import pandas as pd
 import numpy as np
+import glob
 from typing import Tuple
+
+def create_splits(final_dim, tiles_dim, base_path='data', verbose=True):
+    """
+    Create train, validation, and test splits based on the images and masks present in the specified path.
+
+    Args:
+        final_dim (int): The final dimension of the tiles.
+        tiles_dim (int): The dimension of the tiles.
+        base_path (str): The base path where the data is stored. Default is 'data'.
+
+    Returns:
+        tuple: A tuple containing train_split, val_split, and test_split.
+    """
+    tiles_path = f'{base_path}/tiles_{final_dim}/{tiles_dim}x{tiles_dim}'
+    splits = ['train', 'val', 'test']
+    all_paths = {'train': [], 'val': [], 'test': []}
+
+    for split in splits:
+        img_paths = sorted(glob.glob(f'{tiles_path}/{split}/images/*.png'))
+        mask_paths = sorted(glob.glob(f'{tiles_path}/{split}/masks/*.png'))
+        all_paths[split] = np.array(list(zip(img_paths, mask_paths))).tolist()
+
+    train_split = all_paths['train']
+    val_split = all_paths['val']
+    test_split = all_paths['test']
+
+    print(f'Train split: {len(train_split)} samples')
+    print(f'Validation split: {len(val_split)} samples')
+    print(f'Test split: {len(test_split)} samples')
+
+    return train_split, val_split, test_split
 
 def read_class_colors(
     file_path: str,
@@ -27,9 +59,7 @@ def read_class_colors(
     labels_colors['RGB'] = labels_colors[['r', 'g', 'b']].apply(tuple, axis=1)
     colors = np.array(labels_colors['RGB'].values)
 
-    # No conflicting labels found
-    # Therefore there are 23 classes in the dataset
-    nr_classes = len(labels_colors) - 1
+    nr_classes = len(labels_colors)
     if verbose:
         print(f'Number of classes: {nr_classes}')
 
