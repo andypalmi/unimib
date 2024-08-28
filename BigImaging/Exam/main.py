@@ -130,7 +130,7 @@ NUM_EPOCHS = 100
 PROFILE = False
 TRAIN = False
 TEST = False
-PLOT = True
+PLOT = False
 
 # Early stopping parameters
 PATIENCE = 10
@@ -318,13 +318,28 @@ if TEST:
 
 
 if PLOT:
-    # Interesting images 6468 6467 9045 9348
-    model_path = 'models/best/model_epoch_14_final_dim_256_tiles_dim_1000_val_loss_0.2875_train_loss_0.1842_arch_DeepLabV3Plus_encoder_name_resnet34.pt'
-    model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path)
-    image_number = '9348'
     path_to_tiles = 'data/tiles_256/1000x1000/test/'
-    predict_and_plot_grid(
-        model=model, 
-        image_number=image_number, 
-        path_to_tiles=path_to_tiles, 
-        colors=colors)
+    test_img_paths = sorted(glob.glob(os.path.join(path_to_tiles, 'images/*.png')))
+    for i in range(0):
+        random = np.random.randint(0, len(test_img_paths))
+        image_number = test_img_paths[random].split('/')[-1].split('.')[0].split('_')[0]
+        print(f'Image number: {image_number}')
+        resnet34_model_path = 'models/best/model_epoch_14_final_dim_256_tiles_dim_1000_val_loss_0.2875_train_loss_0.1842_arch_DeepLabV3Plus_encoder_name_resnet34.pt'
+        mbv2_model_path = 'models/best/model_epoch_10_final_dim_256_tiles_dim_1000_val_loss_0.2726_train_loss_0.2466_arch_DeepLabV3Plus_encoder_name_mobilenet_v2.pt'
+        model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(resnet34_model_path)
+
+        predict_and_plot_grid(
+            model=model,
+            config=config, 
+            image_number=image_number, 
+            path_to_tiles=path_to_tiles, 
+            colors=colors)
+        
+        model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(mbv2_model_path)
+
+        predict_and_plot_grid(
+            model=model,
+            config=config, 
+            image_number=image_number, 
+            path_to_tiles=path_to_tiles, 
+            colors=colors)

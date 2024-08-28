@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import cv2
 import torch
+from torchvision.transforms import transforms
 
 def create_splits(final_dim, tiles_dim, base_path='data', verbose=True):
     """
@@ -103,9 +104,9 @@ def load_tiles(image_number, path, rows=3, cols=4):
 
 def reconstruct_image(tiles, rows=3, cols=4, tile_size=256, channels=3):
     if channels == 3:  # RGB image
-        image = np.zeros((rows * tile_size, cols * tile_size, channels), dtype=np.uint8)
+        image = np.zeros((rows * tile_size, cols * tile_size, channels), dtype=tiles[0].dtype)
     else:  # Grayscale image (single channel)
-        image = np.zeros((rows * tile_size, cols * tile_size), dtype=np.uint8)
+        image = np.zeros((rows * tile_size, cols * tile_size), dtype=tiles[0].dtype)
     
     for i in range(rows):
         for j in range(cols):
@@ -115,45 +116,69 @@ def reconstruct_image(tiles, rows=3, cols=4, tile_size=256, channels=3):
 
 def colorize_mask(mask, colors):
     colorized_mask = np.zeros((*mask.shape[:2], 3), dtype=np.uint8)  # Ensure output has only 3 channels
-    mask = mask[:, :, 0] # Ensure mask is 2D
+    if len(mask.shape) == 3:
+        mask = mask[:, :, 0] # Ensure mask is 2D
     for i, color in enumerate(colors):
         colorized_mask[mask == i] = color
     return colorized_mask
 
-def plot_grid(original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask):
+def plot_grid(image_number, config, original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask):
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-    images = [original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask]
-    titles = ['Original Image', 'Ground Truth Mask', 'Predicted Mask', 'Model Confidence', 'Mask Overlaid on Image', 'Difference Mask']
+    axes[0, 0].imshow(original_img)
+    axes[0, 0].set_title('Original Image')
     
-    for ax, img, title in zip(axes.flatten(), images, titles):
-        ax.imshow(img, cmap='gray' if img.ndim == 2 else None)  # Automatically handle grayscale images
-        ax.set_title(title)
+    axes[0, 1].imshow(true_mask)
+    axes[0, 1].set_title('Ground Truth Mask')
+    
+    axes[0, 2].imshow(pred_mask)
+    axes[0, 2].set_title('Predicted Mask')
+    
+    im_pred_probs = axes[1, 0].imshow(pred_probs, cmap='afmhot')
+    axes[1, 0].set_title('Model Confidence')
+    fig.colorbar(im_pred_probs, ax=axes[1, 0], orientation='vertical')
+    
+    axes[1, 1].imshow(overlaid_img)
+    axes[1, 1].set_title('Mask Overlaid on Image')
+    
+    im_diff_mask = axes[1, 2].imshow(diff_mask, cmap='gray')
+    axes[1, 2].set_title('Difference Mask')
+    fig.colorbar(im_diff_mask, ax=axes[1, 2], orientation='vertical')
+    
+    for ax in axes.flatten():
         ax.axis('off')
 
     plt.tight_layout()
     plt.show()
 
-def predict_and_plot_grid(model, image_number, path_to_tiles, colors, device='cuda' if torch.cuda.is_available() else 'cpu', tile_size=256):
+    plt.savefig(f'output/grid_{image_number}_{config['encoder_name']}.png')
+
+def predict_and_plot_grid(model, config, image_number, path_to_tiles, colors, device='cuda' if torch.cuda.is_available() else 'cpu', tile_size=256):
+    model.eval()  # Ensure the model is in evaluation mode
     image_tiles, mask_tiles = load_tiles(image_number, path_to_tiles)
     
     original_img = reconstruct_image(image_tiles, channels=3)  # RGB image reconstruction
-    true_mask = reconstruct_image(mask_tiles, channels=1)  # Grayscale mask reconstruction
+    true_mask = reconstruct_image(mask_tiles, channels=3)  # Grayscale mask reconstruction
     
     colorized_true_mask = colorize_mask(true_mask, colors)
+
+    # Define the normalization transform
+    normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
     pred_mask_tiles, pred_prob_tiles = [], []
     for tile in image_tiles:
         tile_tensor = torch.tensor(tile).unsqueeze(0).permute(0, 3, 1, 2).float().to(device) / 255.0
+        tile_tensor = normalize(tile_tensor)
         with torch.no_grad():
             output = model(tile_tensor)
             pred_probs = torch.softmax(output, dim=1).squeeze(0)
             pred_mask = torch.argmax(pred_probs, dim=0).cpu().numpy()
             pred_mask_tiles.append(pred_mask)
-            pred_prob_tiles.append(pred_probs.max(0)[0].cpu().numpy())
+            max_probs = pred_probs.max(0)[0].cpu().numpy()
+            pred_prob_tiles.append(max_probs)
 
     # Reconstruct the predicted mask and probability images as single-channel
     pred_mask = reconstruct_image(np.array(pred_mask_tiles), tile_size=tile_size, channels=1)
-    pred_probs = reconstruct_image(np.array(pred_prob_tiles), tile_size=tile_size, channels=1)
+    pred_probs = ((reconstruct_image(np.array(pred_prob_tiles), tile_size=tile_size, channels=1) * 255) - 0) / 255
     
     # Colorize the predicted mask
     colorized_pred_mask = colorize_mask(pred_mask, colors)
@@ -163,7 +188,7 @@ def predict_and_plot_grid(model, image_number, path_to_tiles, colors, device='cu
     overlaid_img = cv2.addWeighted(original_img, 1-alpha, colorized_pred_mask, alpha, 0)
 
     # Compute the difference mask (note: compare single-channel masks)
-    diff_mask = (true_mask != pred_mask).astype(np.uint8) * 255
+    diff_mask = (((true_mask[:, :, 0] != pred_mask).astype(np.uint8) * 255) - 0) / 255 
 
     # Plot everything
-    plot_grid(original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask)
+    plot_grid(image_number, config, original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask)
