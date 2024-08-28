@@ -1,7 +1,7 @@
 **/data/**
 **/data/**/*
 *.mat
-*.csv
+# *.csv
 *.tar
 *.zip
 *.tif

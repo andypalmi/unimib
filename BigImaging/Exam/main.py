@@ -27,6 +27,7 @@ from utils.metrics import compute_metrics_torch
 from utils.train import train, validate
 from utils.utils import save_profiling_tables, create_splits
 from utils.train import save_model, save_model_stats, read_csv_with_empty_handling, initialize_best_val_loss
+from utils.evaluate import load_model_from_checkpoint, evaluate_model
 
 # Set the current working directory to the directory where main.py is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -62,7 +63,7 @@ labels_colors, colors, num_classes = read_class_colors('data/ColorMasks/ColorPal
 
 # Get image and mask paths for tiles
 final_dim = 256
-tiles_dim = 750
+tiles_dim = 1000
 train_split, val_split, test_split = create_splits(final_dim, tiles_dim)
 
 # Create the Datasets
@@ -73,7 +74,7 @@ test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_
 
 # Create the DataLoaders
 num_workers = 12
-batch_size_train = 60
+batch_size_train = 120
 batch_size_valtest = 150
 dataloader_kwargs = {'shuffle': True, 'pin_memory': True, 'num_workers': num_workers, 
                      'persistent_workers': True, 'prefetch_factor': 5, 
@@ -90,8 +91,8 @@ test_loader = DataLoader(test_ds, **valtest_kwargs)
 config = {
     'arch': 'DeepLabV3Plus',
     # 'encoder_name': 'efficientnet-b5',
-    # 'encoder_name': 'resnet34',
-    'encoder_name': 'mobilenet_v2',
+    'encoder_name': 'resnet18',
+    # 'encoder_name': 'mobilenet_v2',
     'encoder_weights': 'imagenet',
     'in_channels': 3,
     'classes': num_classes
@@ -114,20 +115,21 @@ accumulation_steps = 1
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MODEL.to(DEVICE)
 criterion = nn.CrossEntropyLoss()
-LEARNING_RATE = 1e-4
-WEIGHT_DECAY = 1e-4
+LEARNING_RATE = 5e-5
+WEIGHT_DECAY = LEARNING_RATE * 10
 optimizer = AdamW(MODEL.parameters(), lr=LEARNING_RATE)
 NUM_EPOCHS = 100
-TRAIN = True
 PROFILE = False
+TRAIN = False
+TEST = True
 
 # Early stopping parameters
-PATIENCE = 5
-MIN_EPOCHS = 5
+PATIENCE = 10
+MIN_EPOCHS = 10
 early_stopping_counter = 0
 
 # Learning rate scheduler
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=25)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, eta_min=LEARNING_RATE / 10)
 
 if TRAIN:
     # Initialize best validation loss
@@ -178,8 +180,8 @@ if TRAIN:
                 train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, use_amp=True)
                 pbar.update(1)
                 pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i+1):.3f}')
-                if i % 100 == 0 or i == (len(train_loader) - 1):
-                    writer.add_scalar('Loss training', train_loss / (i+1), (i/len(train_loader)) + epoch)
+                if i % (len(train_loader)/10) == 0 or i == len(train_loader) - 1:
+                    writer.add_scalar('Loss training', train_loss / (i+1), ((i/len(train_loader)) + epoch)*10)
 
         # Calculate average training loss
         train_loss = train_loss.item() / len(train_loader)
@@ -276,3 +278,31 @@ if TRAIN:
 
     # Close Tensorboard writer
     writer.close()
+
+if TEST:
+    results = []
+
+    model_dir = 'models/best'
+    output_csv = os.path.join(model_dir, 'test_results.csv')
+    model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
+
+    for model_file in model_files:
+        model_path = os.path.join(model_dir, model_file)
+        model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path)
+        
+        mean_iou, accuracy, mean_dice, per_class_iou = evaluate_model(num_classes, model, test_loader, criterion)
+        
+        results.append({
+            'arch': config['arch'],
+            'encoder_name': config['encoder_name'],
+            'tiles_dim': model_tiles_dim,
+            'final_dim': model_final_dim,
+            'mean_iou': mean_iou,
+            'accuracy': accuracy,
+            'mean_dice': mean_dice,
+            'per_class_iou': per_class_iou
+        })
+    
+    # Create a DataFrame and write to CSV
+    df = pd.DataFrame(results)
+    df.to_csv(output_csv, index=False)

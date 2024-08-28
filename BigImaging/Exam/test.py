@@ -1,5 +1,6 @@
 # import pandas as pd
 import os
+import pandas as pd
 # import glob
 # from utils.utils import read_class_colors
 # from tqdm import tqdm
@@ -36,43 +37,14 @@ print("Current working directory set to:", os.getcwd())
 # # labels_colors, colors, num_classes = read_class_colors('data/class_dict_seg.csv')
 # # print("Class Colors:", labels_colors)
 
-import pandas as pd
-import glob
+# Load the CSV file
+df = pd.read_csv('models/best/test_results.csv')
 
-from utils.tiling import create_and_save_tiles
+# Round all decimal numbers to 5 decimal places
+df = df.round(5)
 
-# Tiling
+# Round the decimal numbers in the 'per_class_iou' column to 5 decimal places
+df['per_class_iou'] = df['per_class_iou'].apply(lambda x: [round(float(v), 5) for v in eval(x)])
 
-path = 'data/FloodNet'
-
-data = []
-
-for folder in glob.glob(f'{path}/*'):
-    images_paths = sorted(glob.glob(f'{folder}/images/*'))
-    masks_paths = sorted(glob.glob(f'{folder}/masks/*'))
-    
-    for img_path, mask_path in zip(images_paths, masks_paths):
-        data.append({
-            'split': folder.split('/')[-1].split('/')[-1],
-            'img': img_path,
-            'mask': mask_path
-        })
-
-df = pd.DataFrame(data, columns=['split', 'img', 'mask'])
-
-print(df.shape)
-
-import concurrent.futures
-from tqdm import tqdm
-
-already_created = False
-
-def process_row(row):
-    tiles_dim = 750
-    final_dim = 256
-    create_and_save_tiles(split=row['split'], img_path=row['img'], mask_path=row['mask'], 
-                          tiles_dim=tiles_dim, final_dim=final_dim, output_dir=f'data/tiles_{final_dim}')
-
-if not already_created:
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        list(tqdm(executor.map(process_row, [df.iloc[i] for i in range(df.shape[0])]), total=df.shape[0]))
+# Save the updated DataFrame back to the CSV file
+df.to_csv('models/best/test_results.csv', index=False)
