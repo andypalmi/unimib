@@ -320,9 +320,10 @@ if TEST:
 if PLOT:
     path_to_tiles = 'data/tiles_256/1000x1000/test/'
     test_img_paths = sorted(glob.glob(os.path.join(path_to_tiles, 'images/*.png')))
-    for i in range(0):
+    for i in range(1):
         random = np.random.randint(0, len(test_img_paths))
-        image_number = test_img_paths[random].split('/')[-1].split('.')[0].split('_')[0]
+        # image_number = test_img_paths[random].split('/')[-1].split('.')[0].split('_')[0]
+        image_number = '7320'
         print(f'Image number: {image_number}')
         resnet34_model_path = 'models/best/model_epoch_14_final_dim_256_tiles_dim_1000_val_loss_0.2875_train_loss_0.1842_arch_DeepLabV3Plus_encoder_name_resnet34.pt'
         mbv2_model_path = 'models/best/model_epoch_10_final_dim_256_tiles_dim_1000_val_loss_0.2726_train_loss_0.2466_arch_DeepLabV3Plus_encoder_name_mobilenet_v2.pt'
@@ -333,7 +334,8 @@ if PLOT:
             config=config, 
             image_number=image_number, 
             path_to_tiles=path_to_tiles, 
-            colors=colors)
+            colors=colors,
+            classes_df=labels_colors)
         
         model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(mbv2_model_path)
 
@@ -342,4 +344,5 @@ if PLOT:
             config=config, 
             image_number=image_number, 
             path_to_tiles=path_to_tiles, 
-            colors=colors)
+            colors=colors,
+            classes_df=labels_colors)

@@ -122,7 +122,9 @@ def colorize_mask(mask, colors):
         colorized_mask[mask == i] = color
     return colorized_mask
 
-def plot_grid(image_number, config, original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask):
+import matplotlib.patches as mpatches
+
+def plot_grid(image_number, config, original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask, class_df):
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
     axes[0, 0].imshow(original_img)
     axes[0, 0].set_title('Original Image')
@@ -147,12 +149,35 @@ def plot_grid(image_number, config, original_img, true_mask, pred_mask, pred_pro
     for ax in axes.flatten():
         ax.axis('off')
 
+    # Create custom legend handles based on the class colors
+    legend_handles = []
+    for _, row in class_df.iterrows():
+        # Normalize RGB values to 0-1 range
+        normalized_rgb = tuple(c / 255.0 for c in row['RGB'])
+        patch = mpatches.Patch(color=normalized_rgb, label=row['class'])
+        legend_handles.append(patch)
+
+    # Add the legend on the right side of the plot
+    fig.legend(handles=legend_handles, loc='center left', bbox_to_anchor=(1.05, 0.5), title="Classes")
+
     plt.tight_layout()
     plt.show()
 
-    plt.savefig(f'output/grid_{image_number}_{config['encoder_name']}.png')
+    plt.savefig(f"output/grid_{image_number}_{config['encoder_name']}_with_legend.png", bbox_inches='tight')
 
-def predict_and_plot_grid(model, config, image_number, path_to_tiles, colors, device='cuda' if torch.cuda.is_available() else 'cpu', tile_size=256):
+def predict_and_plot_grid(model, config, image_number, path_to_tiles, colors, classes_df, device='cuda' if torch.cuda.is_available() else 'cpu', tile_size=256):
+    """
+    Predicts and plots a grid of images using a given model.
+    Args:
+        model (torch.nn.Module): The model used for prediction.
+        config: The configuration object.
+        image_number (str): The number of the image.
+        path_to_tiles (str): The path to the image tiles.
+        colors (list): The list of colors for mask visualization.
+        classes_df: The dataframe containing the classes information.
+        device (str, optional): The device to use for prediction. Defaults to 'cuda' if available, else 'cpu'.
+        tile_size (int, optional): The size of the image tiles. Defaults to 256.
+    """
     model.eval()  # Ensure the model is in evaluation mode
     image_tiles, mask_tiles = load_tiles(image_number, path_to_tiles)
     
@@ -191,4 +216,4 @@ def predict_and_plot_grid(model, config, image_number, path_to_tiles, colors, de
     diff_mask = (((true_mask[:, :, 0] != pred_mask).astype(np.uint8) * 255) - 0) / 255 
 
     # Plot everything
-    plot_grid(image_number, config, original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask)
+    plot_grid(image_number, config, original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask, classes_df)
