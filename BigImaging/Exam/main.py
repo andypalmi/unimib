@@ -346,3 +346,30 @@ if PLOT:
             path_to_tiles=path_to_tiles, 
             colors=colors,
             classes_df=labels_colors)
+
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
+path_to_images = f'data/FloodNet/train/images'
+path_to_masks = f'data/ColorMasks/TrainSet'
+test_img_paths = sorted(glob.glob(os.path.join(path_to_images, '*')))
+test_mask_paths = sorted(glob.glob(os.path.join(path_to_masks, '*')))
+print(f'Found {len(test_img_paths)} images in the train set.')
+for a in tqdm(range(5)):
+    random_indices = np.random.choice(len(test_img_paths), size=12, replace=False)
+    random_images = [test_img_paths[i] for i in random_indices]
+    random_masks = [test_mask_paths[i] for i in random_indices]
+
+    fig, axs = plt.subplots(3, 4, figsize=(15, 10))
+
+    for folder in ['images', 'masks']:
+        for i, img_path in enumerate(random_images if folder == 'images' else random_masks):
+            row = i // 4
+            col = i % 4
+            img = mpimg.imread(img_path)
+            axs[row, col].imshow(img)
+            axs[row, col].axis('off')
+
+        plt.tight_layout()
+        plt.savefig(f'output/collection_{folder}_{a}.png')
+        plt.show()
