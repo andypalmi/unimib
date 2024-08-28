@@ -8,7 +8,9 @@ from typing import Any, Dict, Tuple, List
 from torch import nn
 from torch.utils.data import DataLoader
 
-def load_model_from_checkpoint(checkpoint_path: str, device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> Tuple[nn.Module, Dict[str, Any], int, int]:
+def load_model_from_checkpoint(
+        checkpoint_path: str, 
+        device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> Tuple[nn.Module, Dict[str, Any], int, int]:
     """
     Load a model from a checkpoint file.
     Args:
@@ -27,12 +29,18 @@ def load_model_from_checkpoint(checkpoint_path: str, device: str = 'cuda' if tor
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
-    print(f'Created model with config {config} and loaded weights from {checkpoint_path}')
+    # print(f'Created model with config {config} and loaded weights from {checkpoint_path}')
 
     return model, config, tiles_dim, final_dim
 
 
-def evaluate_model(num_classes: int, model: Any, test_loader: DataLoader, criterion: Any, device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> Tuple[float, float, float, List[float]]:
+def evaluate_model(
+        num_classes: int, 
+        model: Any, 
+        test_loader: DataLoader, 
+        criterion: Any, 
+        device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+        decimal_places: int = 5) -> Tuple[float, float, float, List[float]]:
     """
     Evaluate a model and compute metrics.
     Args:
@@ -41,6 +49,7 @@ def evaluate_model(num_classes: int, model: Any, test_loader: DataLoader, criter
         test_loader (DataLoader): The data loader for the test dataset.
         criterion (Any): The loss criterion.
         device (str, optional): The device to use for evaluation. Defaults to 'cuda' if available, else 'cpu'.
+        decimal_places (int, optional): The number of decimal places to round the metrics to. Defaults to 5.
     Returns:
         Tuple[float, float, float, List[float]]: A tuple containing the mean IoU, accuracy, mean dice, and per-class IoU.
         """
@@ -64,9 +73,9 @@ def evaluate_model(num_classes: int, model: Any, test_loader: DataLoader, criter
                 per_class_iou_accumulators[cls] += batch_metrics["per_class_iou"][cls]
             num_batches += 1
 
-    mean_iou = total_iou / num_batches
-    accuracy = total_accuracy / num_batches
-    mean_dice = total_dice / num_batches
-    per_class_iou = [iou / num_batches for iou in per_class_iou_accumulators]
-    
+    mean_iou = round(total_iou / num_batches, decimal_places)
+    accuracy = round(total_accuracy / num_batches, decimal_places)
+    mean_dice = round(total_dice / num_batches, decimal_places)
+    per_class_iou = [round(iou / num_batches, decimal_places) for iou in per_class_iou_accumulators]
+
     return mean_iou, accuracy, mean_dice, per_class_iou

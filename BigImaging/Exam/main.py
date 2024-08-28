@@ -5,6 +5,9 @@ import pandas as pd
 import os
 import segmentation_models_pytorch as smp
 import concurrent.futures
+import cv2
+import matplotlib.pyplot as plt
+from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -25,7 +28,7 @@ from utils.TilesDataset import TilesDataset
 from utils.transforms import train_transform, valtest_transform
 from utils.metrics import compute_metrics_torch
 from utils.train import train, validate
-from utils.utils import save_profiling_tables, create_splits
+from utils.utils import save_profiling_tables, create_splits, predict_and_plot_grid
 from utils.train import save_model, save_model_stats, read_csv_with_empty_handling, initialize_best_val_loss
 from utils.evaluate import load_model_from_checkpoint, evaluate_model
 
@@ -60,6 +63,8 @@ if not already_created:
 
 # Read class colors from CSV file
 labels_colors, colors, num_classes = read_class_colors('data/ColorMasks/ColorPalette-Values.csv')
+print(f'Class colors: {labels_colors}')
+print(f'Colors in the palette: {colors}')
 
 # Get image and mask paths for tiles
 final_dim = 256
@@ -76,12 +81,15 @@ test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_
 num_workers = 12
 batch_size_train = 120
 batch_size_valtest = 150
+
 dataloader_kwargs = {'shuffle': True, 'pin_memory': True, 'num_workers': num_workers, 
                      'persistent_workers': True, 'prefetch_factor': 5, 
                      'pin_memory_device': 'cuda' if torch.cuda.is_available() else 'cpu'}
+
 train_kwargs = {'batch_size': batch_size_train, **dataloader_kwargs}
 valtest_kwargs = {'batch_size': batch_size_valtest, **dataloader_kwargs}
-print(f'train_kwargs = {train_kwargs}, \nvaltest_kwargs = {valtest_kwargs}')
+
+# print(f'train_kwargs = {train_kwargs}, \nvaltest_kwargs = {valtest_kwargs}')
 
 train_loader = DataLoader(train_ds, **train_kwargs)
 val_loader = DataLoader(val_ds, **valtest_kwargs)
@@ -121,7 +129,8 @@ optimizer = AdamW(MODEL.parameters(), lr=LEARNING_RATE)
 NUM_EPOCHS = 100
 PROFILE = False
 TRAIN = False
-TEST = True
+TEST = False
+PLOT = True
 
 # Early stopping parameters
 PATIENCE = 10
@@ -306,3 +315,16 @@ if TEST:
     # Create a DataFrame and write to CSV
     df = pd.DataFrame(results)
     df.to_csv(output_csv, index=False)
+
+
+if PLOT:
+    # Interesting images 6468 6467 9045 9348
+    model_path = 'models/best/model_epoch_14_final_dim_256_tiles_dim_1000_val_loss_0.2875_train_loss_0.1842_arch_DeepLabV3Plus_encoder_name_resnet34.pt'
+    model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path)
+    image_number = '9348'
+    path_to_tiles = 'data/tiles_256/1000x1000/test/'
+    predict_and_plot_grid(
+        model=model, 
+        image_number=image_number, 
+        path_to_tiles=path_to_tiles, 
+        colors=colors)

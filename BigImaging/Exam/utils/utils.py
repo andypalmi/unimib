@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import glob
 from typing import Tuple
+from PIL import Image
+import matplotlib.pyplot as plt
+import os
+import cv2
+import torch
 
 def create_splits(final_dim, tiles_dim, base_path='data', verbose=True):
     """
@@ -85,3 +90,80 @@ def save_profiling_tables(prof, logs_dir):
     with open(f'{logs_dir}/cuda_time_total.txt', 'w') as f:
         f.write(cuda_time_table)
         print(f'CUDA time table saved to {logs_dir}/cuda_time_total.txt')
+
+def load_tiles(image_number, path, rows=3, cols=4):
+    image_tiles = []
+    mask_tiles = []
+    for i in range(rows * cols):
+        image_path = os.path.join(path, 'images', f'{image_number}_{i}.png')
+        mask_path = os.path.join(path, 'masks', f'{image_number}_{i}.png')
+        image_tiles.append(np.array(Image.open(image_path)))
+        mask_tiles.append(np.array(Image.open(mask_path)))
+    return np.array(image_tiles), np.array(mask_tiles)
+
+def reconstruct_image(tiles, rows=3, cols=4, tile_size=256, channels=3):
+    if channels == 3:  # RGB image
+        image = np.zeros((rows * tile_size, cols * tile_size, channels), dtype=np.uint8)
+    else:  # Grayscale image (single channel)
+        image = np.zeros((rows * tile_size, cols * tile_size), dtype=np.uint8)
+    
+    for i in range(rows):
+        for j in range(cols):
+            image[i*tile_size:(i+1)*tile_size, j*tile_size:(j+1)*tile_size] = tiles[i * cols + j]
+    
+    return image
+
+def colorize_mask(mask, colors):
+    colorized_mask = np.zeros((*mask.shape[:2], 3), dtype=np.uint8)  # Ensure output has only 3 channels
+    mask = mask[:, :, 0] # Ensure mask is 2D
+    for i, color in enumerate(colors):
+        colorized_mask[mask == i] = color
+    return colorized_mask
+
+def plot_grid(original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask):
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    images = [original_img, true_mask, pred_mask, pred_probs, overlaid_img, diff_mask]
+    titles = ['Original Image', 'Ground Truth Mask', 'Predicted Mask', 'Model Confidence', 'Mask Overlaid on Image', 'Difference Mask']
+    
+    for ax, img, title in zip(axes.flatten(), images, titles):
+        ax.imshow(img, cmap='gray' if img.ndim == 2 else None)  # Automatically handle grayscale images
+        ax.set_title(title)
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+def predict_and_plot_grid(model, image_number, path_to_tiles, colors, device='cuda' if torch.cuda.is_available() else 'cpu', tile_size=256):
+    image_tiles, mask_tiles = load_tiles(image_number, path_to_tiles)
+    
+    original_img = reconstruct_image(image_tiles, channels=3)  # RGB image reconstruction
+    true_mask = reconstruct_image(mask_tiles, channels=1)  # Grayscale mask reconstruction
+    
+    colorized_true_mask = colorize_mask(true_mask, colors)
+
+    pred_mask_tiles, pred_prob_tiles = [], []
+    for tile in image_tiles:
+        tile_tensor = torch.tensor(tile).unsqueeze(0).permute(0, 3, 1, 2).float().to(device) / 255.0
+        with torch.no_grad():
+            output = model(tile_tensor)
+            pred_probs = torch.softmax(output, dim=1).squeeze(0)
+            pred_mask = torch.argmax(pred_probs, dim=0).cpu().numpy()
+            pred_mask_tiles.append(pred_mask)
+            pred_prob_tiles.append(pred_probs.max(0)[0].cpu().numpy())
+
+    # Reconstruct the predicted mask and probability images as single-channel
+    pred_mask = reconstruct_image(np.array(pred_mask_tiles), tile_size=tile_size, channels=1)
+    pred_probs = reconstruct_image(np.array(pred_prob_tiles), tile_size=tile_size, channels=1)
+    
+    # Colorize the predicted mask
+    colorized_pred_mask = colorize_mask(pred_mask, colors)
+
+    # Create the overlay image
+    alpha = 0.4
+    overlaid_img = cv2.addWeighted(original_img, 1-alpha, colorized_pred_mask, alpha, 0)
+
+    # Compute the difference mask (note: compare single-channel masks)
+    diff_mask = (true_mask != pred_mask).astype(np.uint8) * 255
+
+    # Plot everything
+    plot_grid(original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask)
