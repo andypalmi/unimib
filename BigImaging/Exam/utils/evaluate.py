@@ -9,7 +9,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 def load_model_from_checkpoint(
-        checkpoint_path: str, 
+        checkpoint_path: str,
+        evaluation = True, 
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> Tuple[nn.Module, Dict[str, Any], int, int]:
     """
     Load a model from a checkpoint file.
@@ -28,7 +29,8 @@ def load_model_from_checkpoint(
     model = smp.create_model(**config)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
-    model.eval()
+    if evaluation:
+        model.eval()
     # print(f'Created model with config {config} and loaded weights from {checkpoint_path}')
 
     return model, config, tiles_dim, final_dim
