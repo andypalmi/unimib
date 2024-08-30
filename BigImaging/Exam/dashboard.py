@@ -31,7 +31,7 @@ app.layout = html.Div(id='app-container', children=[
     html.Div([
         html.Img(src='assets/drone_white.png', style={'height': '50px', 'margin-right': '10px'}),
         html.H1('SkySegmenter', style={'display': 'inline-block', 'vertical-align': 'middle'}),
-    ], style={'text-align': 'center', 'margin-bottom': '20px'}),
+    ], style={'text-align': 'center', 'margin-bottom': '20px', 'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
     
     dcc.Upload(
         id='upload-image',
@@ -110,13 +110,16 @@ def get_model_options(models_folder):
     return model_options
 
 def prepare_tiles(tiles, device='cuda' if torch.cuda.is_available() else 'cpu'):
+    logger.info(f'Using device: {device}')
     normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     
+    # Convert tiles to a NumPy array and then to a PyTorch tensor
     tiles_np = np.stack(tiles, axis=0)
+    batch_tensor = torch.from_numpy(tiles_np).permute(0, 3, 1, 2).float() / 255.0
     
-    batch_tensor = torch.tensor(tiles_np).permute(0, 3, 1, 2).float() / 255.0
-    
-    batch_tensor = normalize(batch_tensor).to(device)
+    # Move the tensor to the device and apply normalization
+    batch_tensor = batch_tensor.to(device)
+    batch_tensor = normalize(batch_tensor)
     
     return batch_tensor
 
@@ -196,7 +199,7 @@ def update_output(contents, model_filename, alpha):
     if contents and model_filename:
         try:
             # Generate a hash for the uploaded content and model filename
-            content_hash = get_cache_key(contents, model_filename)
+            content_hash = hashlib.md5((contents + model_filename).encode()).hexdigest()
             
             logger.info('Chosen model: %s', model_filename)
             
@@ -225,16 +228,16 @@ def update_output(contents, model_filename, alpha):
             
             overlay_image = overlay_mask_on_image(resized_original_image, colorized_mask, alpha)
             # Encode the mask as a base64 string
-            _, buffer = cv2.imencode('.png', predicted_mask)
-            mask_data = base64.b64encode(buffer).decode('utf-8')
+            _, buffer = cv2.imencode('.png', overlay_image)
+            overlay_image_base64 = base64.b64encode(buffer).decode('utf-8')
             # Display the overlay image
             return html.Div([
-                html.Img(id='overlay-image', src=f'data:image/png;base64,{base64.b64encode(cv2.imencode(".png", overlay_image)[1]).decode()}')
-            ]), mask_data
+                html.Img(id='overlay-image', src=f'data:image/png;base64,{overlay_image_base64}')
+            ])
         except Exception as e:
             logger.error('Error in update_output: %s', str(e))
             return 'An error occurred during processing.', ''
     return 'Upload an image and select a model.', ''
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False)
