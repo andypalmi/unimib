@@ -76,24 +76,40 @@ def get_model_options(models_folder):
             model_options.append({'label': '_'.join([arch, encoder_name]) + ' (Dim: ' + tiles_dim + ')', 'value': filename})
     return model_options
 
-normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
 def prepare_tiles(tiles, device='cuda' if torch.cuda.is_available() else 'cpu'):
-    normalized_tiles = []
-    for tile in tiles:
-        tile_tensor = torch.from_numpy(tile).permute(2, 0, 1).float() / 255.0  # Reshape for PyTorch
-        tile_tensor = normalize(tile_tensor)
-        normalized_tiles.append(tile_tensor)
+    """
+    Preprocesses a list of image tiles for input to a PyTorch model.
+    Args:
+        tiles (list): A list of image tiles.
+        device (str, optional): The device to use for tensor operations. Defaults to 'cuda' if available, else 'cpu'.
+    Returns:
+        torch.Tensor: A batch tensor containing the preprocessed image tiles.
+    """
+    normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     
-    # Stack the list of tensors into a single tensor
-    batch_tensor = torch.stack(normalized_tiles)
+    # Convert list of tiles to a single NumPy array
+    tiles_np = np.stack(tiles, axis=0)
     
-    # Move the tensor to the specified device
-    batch_tensor = batch_tensor.to(device)
+    # Convert to tensor and move to device
+    batch_tensor = torch.tensor(tiles_np).permute(0, 3, 1, 2).float().to(device) / 255.0  # Reshape for PyTorch
+    
+    # Apply normalization on the GPU
+    batch_tensor = normalize(batch_tensor)
     
     return batch_tensor
 
 def reconstruct_mask(mask_tiles, img_shape, tiles_dim, final_dim=256):
+    """
+    Reconstructs a mask from a set of mask tiles.
+    Args:
+        mask_tiles (ndarray): Array of mask tiles.
+        img_shape (tuple): Shape of the original image.
+        tiles_dim (int): Dimension of the tiles.
+        final_dim (int, optional): Dimension of the final mask tiles. Defaults to 256.
+    Returns:
+        ndarray: Reconstructed mask.
+    """
     mask_width = img_shape[0] // tiles_dim * final_dim
     mask_height = img_shape[1] // tiles_dim * final_dim
     reconstructed_mask = np.zeros((mask_width, mask_height), dtype=np.uint8)
@@ -129,14 +145,19 @@ class_colors = {
 labels_colors, colors, num_classes = read_class_colors('data/ColorMasks/ColorPalette-Values.csv')
 
 def colorize_mask(predicted_mask):
+    """
+    Colorizes a predicted mask by assigning colors to different class IDs.
+
+    Parameters:
+    - predicted_mask (numpy.ndarray): The predicted mask to be colorized.
+
+    Returns:
+    - colorized_mask (numpy.ndarray): The colorized mask with assigned colors for each class ID.
+    """
     colorized_mask = np.zeros((predicted_mask.shape[0], predicted_mask.shape[1], 3), dtype=np.uint8)
     for class_id, color in class_colors.items():
         colorized_mask[predicted_mask == class_id] = color
     return colorized_mask
-
-def load_color_palette(csv_file):
-    color_palette = pd.read_csv(csv_file)
-    return color_palette
 
 def update_model_options(_):
     return [{'label': model['label'], 'value': model['value']} for model in get_model_options('models/best')]
