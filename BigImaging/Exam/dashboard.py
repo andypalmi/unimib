@@ -11,7 +11,10 @@ from torchvision.transforms import transforms
 from utils.evaluate import load_model_from_checkpoint
 from utils.utils import read_class_colors
 import logging
+import functools
 import hashlib
+import redis
+import pickle
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -61,8 +64,6 @@ app.layout = html.Div(id='app-container', children=[
             id='output-image-upload', 
             style={'text-align': 'center'})
     ),
-    html.Div(id='hover-info', style={'position': 'absolute', 'pointer-events': 'none', 'background': 'white', 'padding': '5px', 'border': '1px solid black'}),
-    html.Div(id='mask-data', style={'display': 'none'})  # Hidden div to store mask data
 ])
 
 # Global dictionary to store predictions
@@ -174,9 +175,19 @@ def update_model_options(_):
 def update_dropdown_options(contents):
     return update_model_options(contents)
 
+# Connect to Redis
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+# Define a cache with a maximum size
+@functools.lru_cache(maxsize=128)
+def get_prediction_cache_key(contents, model_filename):
+    return hashlib.md5((contents + model_filename).encode()).hexdigest()
+
+def get_cache_key(contents, model_filename):
+    return hashlib.md5((contents + model_filename).encode()).hexdigest()
+
 @app.callback(
     Output('output-image-upload', 'children'),
-    Output('mask-data', 'children'),  # Output to store mask data
     Input('upload-image', 'contents'),
     Input('model-dropdown', 'value'),
     Input('alpha-slider', 'value')
@@ -184,12 +195,16 @@ def update_dropdown_options(contents):
 def update_output(contents, model_filename, alpha):
     if contents and model_filename:
         try:
-            # Generate a hash for the uploaded content
-            content_hash = hashlib.md5(contents.encode()).hexdigest()
+            # Generate a hash for the uploaded content and model filename
+            content_hash = get_cache_key(contents, model_filename)
             
-            if content_hash in predictions_cache:
+            logger.info('Chosen model: %s', model_filename)
+            
+            cached_data = redis_client.get(content_hash)
+            if cached_data:
                 logger.info('Using cached prediction')
-                colorized_mask, resized_original_image = predictions_cache[content_hash]
+                predicted_mask, colorized_mask, resized_original_image = pickle.loads(cached_data)
+                logger.info('Loaded cached mask')
             else:
                 tiles_dim = int(model_filename.split('_')[8])
                 tiles, new_shape, original_image = parse_contents(contents=contents, tiles_dim=tiles_dim)
@@ -206,7 +221,7 @@ def update_output(contents, model_filename, alpha):
                 resized_original_image = cv2.resize(original_image, (colorized_mask.shape[1], colorized_mask.shape[0]))
                 
                 # Cache the prediction
-                predictions_cache[content_hash] = (colorized_mask, resized_original_image)
+                redis_client.set(content_hash, pickle.dumps((predicted_mask, colorized_mask, resized_original_image)))
             
             overlay_image = overlay_mask_on_image(resized_original_image, colorized_mask, alpha)
             # Encode the mask as a base64 string
@@ -214,50 +229,12 @@ def update_output(contents, model_filename, alpha):
             mask_data = base64.b64encode(buffer).decode('utf-8')
             # Display the overlay image
             return html.Div([
-                html.Img(id='overlay-image', src=f'data:image/png;base64,{base64.b64encode(cv2.imencode(".png", overlay_image)[1]).decode()}'),
-                dcc.Tooltip(id='tooltip')
+                html.Img(id='overlay-image', src=f'data:image/png;base64,{base64.b64encode(cv2.imencode(".png", overlay_image)[1]).decode()}')
             ]), mask_data
         except Exception as e:
             logger.error('Error in update_output: %s', str(e))
             return 'An error occurred during processing.', ''
     return 'Upload an image and select a model.', ''
-
-# JavaScript for cursor tracking and tooltip
-app.clientside_callback(
-    """
-    function(imageData, maskData) {
-        if (!imageData || !maskData) return;
-        const img = document.getElementById('overlay-image');
-        const tooltip = document.getElementById('tooltip');
-        const mask = new Image();
-        mask.src = 'data:image/png;base64,' + maskData;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        mask.onload = function() {
-            canvas.width = mask.width;
-            canvas.height = mask.height;
-            ctx.drawImage(mask, 0, 0);
-        };
-        img.addEventListener('mousemove', function(event) {
-            const rect = img.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            const pixel = ctx.getImageData(x, y, 1, 1).data;
-            const classId = pixel[0]; // Assuming class ID is stored in the red channel
-            tooltip.style.left = `${event.clientX + 10}px`;
-            tooltip.style.top = `${event.clientY + 10}px`;
-            tooltip.innerHTML = `Class: ${classId}`;
-            tooltip.style.display = 'block';
-        });
-        img.addEventListener('mouseout', function() {
-            tooltip.style.display = 'none';
-        });
-    }
-    """,
-    Output('hover-info', 'children'),
-    Input('output-image-upload', 'children'),
-    State('mask-data', 'children')
-)
 
 if __name__ == '__main__':
     app.run_server(debug=True)
