@@ -23,18 +23,37 @@ logger.info("Current working directory set to: %s", os.getcwd())
 
 app = dash.Dash(__name__)
 
-app.layout = html.Div([
+app.layout = html.Div(id='app-container', children=[
+    html.Div([
+        html.Img(src='assets/drone_white.png', style={'height': '50px', 'margin-right': '10px'}),
+        html.H1('SkySegmenter', style={'display': 'inline-block', 'vertical-align': 'middle'}),
+    ], style={'text-align': 'center', 'margin-bottom': '20px'}),
+    
     dcc.Upload(
         id='upload-image',
         children=html.Button('Upload Image'),
-        multiple=False
+        multiple=False,
+        style={'display': 'block', 'margin': '0 auto'}
     ),
     dcc.Dropdown(
         id='model-dropdown',
         options=[],
-        placeholder='Select a model'
+        placeholder='Select a model',
+        style={'width': '50%', 'margin': '20px auto', 'color': 'black'}
     ),
-    html.Div(id='output-image-upload'),
+    html.Div(
+        dcc.Slider(
+            id='alpha-slider',
+            min=0,
+            max=1,
+            step=0.01,
+            value=0.5,
+            marks=None,
+            tooltip={"placement": "bottom", "always_visible": True, "transform": "percentageFormat"},
+        ),
+        style={'width': '50%', 'margin': '20px auto'}
+    ),
+    html.Div(id='output-image-upload', style={'text-align': 'center'}),
 ])
 
 def parse_contents(contents, tiles_dim=1000, final_dim=256):
@@ -72,7 +91,7 @@ def parse_contents(contents, tiles_dim=1000, final_dim=256):
             tile = cv2.resize(tile, (final_dim, final_dim))
             if tile.size > 0:
                 tiles.append(tile)
-    return tiles, new_shape
+    return tiles, new_shape, img
 
 def get_model_options(models_folder):
     """
@@ -171,7 +190,7 @@ class_colors = {
 
 labels_colors, colors, num_classes = read_class_colors('data/ColorMasks/ColorPalette-Values.csv')
 
-def colorize_mask(predicted_mask): 
+def colorize_mask(predicted_mask):
     """
     Colorizes a predicted mask by assigning colors to different class IDs.
 
@@ -186,6 +205,21 @@ def colorize_mask(predicted_mask):
         colorized_mask[predicted_mask == class_id] = color
     return colorized_mask
 
+def overlay_mask_on_image(image, mask, alpha=0.5):
+    """
+    Overlays the colorized mask on the original image with adjustable alpha transparency.
+
+    Args:
+        image (numpy.ndarray): The original image.
+        mask (numpy.ndarray): The colorized mask.
+        alpha (float): The alpha transparency for the mask.
+
+    Returns:
+        numpy.ndarray: The image with the mask overlay.
+    """
+    overlay = cv2.addWeighted(image, 1 - alpha, mask, alpha, 0)
+    return overlay
+
 def update_model_options(_):
     return [{'label': model['label'], 'value': model['value']} for model in get_model_options('models/best')]
 
@@ -199,13 +233,14 @@ def update_dropdown_options(contents):
 @app.callback(
     Output('output-image-upload', 'children'),
     Input('upload-image', 'contents'),
-    Input('model-dropdown', 'value')
+    Input('model-dropdown', 'value'),
+    Input('alpha-slider', 'value')
 )
-def update_output(contents, model_filename):
+def update_output(contents, model_filename, alpha):
     if contents and model_filename:
         try:
             tiles_dim = int(model_filename.split('_')[8])
-            tiles, new_shape = parse_contents(contents=contents, tiles_dim=tiles_dim)
+            tiles, new_shape, original_image = parse_contents(contents=contents, tiles_dim=tiles_dim)
             logger.info('Loaded %d tiles', len(tiles))
             model_path = os.path.join('models', 'best', model_filename)
             logger.info('Loading model from %s', model_path)
@@ -216,8 +251,10 @@ def update_output(contents, model_filename):
                 predicted_masks = torch.softmax(predicted_masks, dim=1).argmax(dim=1).cpu().numpy()
             predicted_mask = reconstruct_mask(predicted_masks, new_shape, tiles_dim, final_dim=256)
             colorized_mask = colorize_mask(predicted_mask)
-            # Display the colorized mask
-            return html.Img(src=f'data:image/png;base64,{base64.b64encode(cv2.imencode(".png", colorized_mask)[1]).decode()}')
+            resized_original_image = cv2.resize(original_image, (colorized_mask.shape[1], colorized_mask.shape[0]))
+            overlay_image = overlay_mask_on_image(resized_original_image, colorized_mask, alpha)
+            # Display the overlay image
+            return html.Img(src=f'data:image/png;base64,{base64.b64encode(cv2.imencode(".png", overlay_image)[1]).decode()}')
         except Exception as e:
             logger.error('Error in update_output: %s', str(e))
             return 'An error occurred during processing.'
