@@ -5,9 +5,7 @@ import pandas as pd
 import os
 import segmentation_models_pytorch as smp
 import concurrent.futures
-import cv2
 import matplotlib.pyplot as plt
-from PIL import Image
 
 import torch
 import torch.nn as nn

@@ -4,6 +4,9 @@ from tqdm import tqdm
 import pandas as pd
 import os
 import segmentation_models_pytorch as smp
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import warnings
 
 import torch
 import torch.nn as nn
@@ -24,13 +27,17 @@ from utils.TilesDataset import TilesDataset
 from utils.transforms import train_transform, valtest_transform
 from utils.metrics import compute_metrics_torch
 from utils.train import train, validate
-from utils.utils import save_profiling_tables
+from utils.utils import save_profiling_tables, predict_and_plot_grid
 from utils.train import save_model, save_model_stats, read_csv_with_empty_handling, initialize_best_val_loss
+from utils.evaluate import load_model_from_checkpoint, evaluate_model
 
 # Set the current working directory to the directory where main.py is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print("Current working directory set to:", os.getcwd())
+
+# Disable specific FutureWarning related to torch.load
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*torch.load.*weights_only=False.*")
 
 # Get the paths of the images and sort them
 images_path = sorted(glob.glob('data/original_images/*.jpg'))
@@ -121,19 +128,22 @@ accumulation_steps = 1
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MODEL.to(DEVICE)
 criterion = nn.CrossEntropyLoss()
-LEARNING_RATE = 1e-4
-WEIGHT_DECAY = 1e-4
+LEARNING_RATE = 5e-5
+WEIGHT_DECAY = LEARNING_RATE * 10
 optimizer = AdamW(MODEL.parameters(), lr=LEARNING_RATE)
 NUM_EPOCHS = 100
-TRAIN = True
 PROFILE = False
+TRAIN = False
+TEST = False
+PLOT = True
 
 # Early stopping parameters
-PATIENCE = 16
+PATIENCE = 10
+MIN_EPOCHS = 10
 early_stopping_counter = 0
 
 # Learning rate scheduler
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=25, eta_min=LEARNING_RATE / 10)
 
 if TRAIN:
     # Initialize best validation loss
@@ -178,11 +188,14 @@ if TRAIN:
                         train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, use_amp=True)
                         pbar.update(1)
                         pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i+1):.3f}')
+        # ELSE NO PROFILE
         else:
             for i, (imgs, masks) in enumerate(pbar):
                 train_loss = train(train_loss, imgs, masks, MODEL, scaler, optimizer, criterion, i, use_amp=True)
                 pbar.update(1)
                 pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i+1):.3f}')
+                if i % (len(train_loader)/10) == 0 or i == len(train_loader) - 1:
+                    writer.add_scalar('Loss training', train_loss / (i+1), ((i/len(train_loader)) + epoch)*10)
 
         # Calculate average training loss
         train_loss = train_loss.item() / len(train_loader)
@@ -193,8 +206,13 @@ if TRAIN:
         # Set model to evaluation mode
         MODEL.eval()
         val_loss = torch.tensor(0.0).to(DEVICE)
-        all_y_true = []
-        all_y_pred = []
+
+        # Initialize accumulators for metrics
+        total_iou = 0.0
+        total_accuracy = 0.0
+        total_dice = 0.0
+        num_batches = 0
+        per_class_iou_accumulators = [0.0] * num_classes
 
         pbar.close()
         pbar_desc = f'Validating | Epoch {epoch+1}/{NUM_EPOCHS}'
@@ -204,33 +222,41 @@ if TRAIN:
         with torch.no_grad():
             for i, (imgs, masks) in enumerate(pbar):
                 val_loss, preds = validate(val_loss, imgs, masks, MODEL, criterion, use_amp=True)
-                all_y_true.append(masks.to(DEVICE))
-                all_y_pred.append(preds)
+
+                # Compute metrics for the current batch
+                batch_metrics = compute_metrics_torch(masks.to(DEVICE), preds.to(DEVICE), num_classes, DEVICE)
+                
+                # Update accumulators
+                total_iou += batch_metrics["weighted_mean_iou"]
+                total_accuracy += batch_metrics["accuracy"]
+                total_dice += batch_metrics["weighted_mean_dice"]
+                for cls in range(num_classes):
+                    per_class_iou_accumulators[cls] += batch_metrics["per_class_iou"][cls]
+                num_batches += 1
 
                 pbar.update(1)
                 pbar.set_description(f'{pbar_desc} | Loss: {val_loss / (i+1):.3f}')
 
-        # Concatenate all predictions and true labels
-        all_y_true = torch.cat(all_y_true, dim=0)
-        all_y_pred = torch.cat(all_y_pred, dim=0)
-
-        # Compute metrics
-        metrics = compute_metrics_torch(all_y_true, all_y_pred, num_classes, DEVICE)
-
         # Calculate average validation loss
         val_loss = val_loss.item() / len(val_loader)
 
-        # Print validation results
-        print(f'\nEpoch: {epoch} - Validation Loss: {val_loss:.3f}, Mean IoU: {metrics["mean_iou"]:.3f}, '
-              f'Accuracy: {metrics["accuracy"]:.3f}, Dice Score: {metrics["mean_dice"]:.3f}, '
-              f'\nper-class IoU: {[f"Class {i}: {iou:.3f}" for i, iou in enumerate(metrics["per_class_iou"])]} \n')
+        # Compute final metrics
+        mean_iou = total_iou / num_batches
+        accuracy = total_accuracy / num_batches
+        mean_dice = total_dice / num_batches
+        per_class_iou = [iou / num_batches for iou in per_class_iou_accumulators]
+
+       # Print validation results
+        print(f'\nEpoch: {epoch} - Validation Loss: {val_loss:.3f}, Mean IoU: {mean_iou:.3f}, '
+            f'Accuracy: {accuracy:.3f}, Mean Dice: {mean_dice:.3f}, '
+            f'\nper-class IoU: {[f"| Class {i}: {iou:.3f} " for i, iou in enumerate(per_class_iou)]} \n')
 
         # Log metrics to Tensorboard
         writer.add_scalar('Loss/train', train_loss, epoch)
         writer.add_scalar('Loss/val', val_loss, epoch)
-        writer.add_scalar('Metrics/accuracy', metrics["accuracy"], epoch)
-        writer.add_scalar('Metrics/mean_dice', metrics["mean_dice"], epoch)
-        writer.add_scalar('Metrics/mean_iou', metrics["mean_iou"], epoch)
+        writer.add_scalar('Metrics/accuracy', accuracy, epoch)
+        writer.add_scalar('Metrics/mean_dice', mean_dice, epoch)
+        writer.add_scalar('Metrics/mean_iou', mean_iou, epoch)
         writer.add_scalar('LR', scheduler.get_last_lr()[0], epoch)
 
         # Check if this is the best model so far (across all runs)
@@ -245,7 +271,8 @@ if TRAIN:
             current_best_val_loss = val_loss
             early_stopping_counter = 0
         else:
-            early_stopping_counter += 1
+            if epoch >= MIN_EPOCHS:
+                early_stopping_counter += 1
 
         # Save the model and its stats
         model_dir = save_model(MODEL, train_loss, val_loss, optimizer, epoch, LEARNING_RATE, config, final_dim, tiles_dim, is_best=is_best)
@@ -260,9 +287,127 @@ if TRAIN:
         scheduler.step()
 
         # Free up memory
-        del all_y_pred, all_y_true
         del val_loss, train_loss
         torch.cuda.empty_cache()
 
     # Close Tensorboard writer
     writer.close()
+
+def create_test_loader(tiles_dim, final_dim=256):
+    # Get image and mask paths for tiles
+    final_dim = final_dim
+    tiles_dim = tiles_dim
+    tiles_path = f'data/tiles_{final_dim}/{tiles_dim}x{tiles_dim}'
+
+    # Get image and mask paths for tiles
+    for folder in os.listdir(tiles_path):
+        if folder == 'images':
+            img_paths = sorted(glob.glob(f'{tiles_path}/{folder}/*.png'))
+        elif folder == 'masks':
+            mask_paths = sorted(glob.glob(f'{tiles_path}/{folder}/*.png'))
+
+    # Combine image and mask paths for tiles
+    paths = np.array(list(zip(img_paths, mask_paths)))
+
+    # Apply 80-10-10 split to tiles
+    _, valtest_split = train_test_split(paths, test_size=0.2, random_state=69420)
+    _, test_split = train_test_split(valtest_split, test_size=0.5, random_state=69420)
+
+    # Create the Datasets
+    test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_dim, tiles=False)
+
+    image_paths = test_ds.image_paths[0]
+
+    # Create the DataLoaders
+    num_workers = 12
+    batch_size_valtest = 20
+    dataloader_kwargs = {'shuffle': True, 'pin_memory': True, 'num_workers': num_workers, 
+                        'persistent_workers': True, 'prefetch_factor': 5, 
+                        'pin_memory_device': 'cuda' if torch.cuda.is_available() else 'cpu'}
+    valtest_kwargs = {'batch_size': batch_size_valtest, **dataloader_kwargs}
+
+    test_loader = DataLoader(test_ds, **valtest_kwargs)
+
+    return test_loader, image_paths
+
+if TEST:
+
+    print(f'\n{'-'*50}\nTesting the models\n{'-'*50}\n')
+    
+    results = []
+
+    model_dir = 'models/best'
+    output_csv = os.path.join(model_dir, 'test_results.csv')
+    model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
+
+    for model_file in tqdm(model_files):
+        model_path = os.path.join(model_dir, model_file)
+        model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path, verbose=False)
+        
+        test_loader, _ = create_test_loader(model_tiles_dim, model_final_dim)
+        
+        mean_iou, accuracy, mean_dice, per_class_iou = evaluate_model(num_classes, model, test_loader, criterion)
+        
+        results.append({
+            'arch': config['arch'],
+            'encoder_name': config['encoder_name'],
+            'tiles_dim': model_tiles_dim,
+            'final_dim': model_final_dim,
+            'mean_iou': mean_iou,
+            'accuracy': accuracy,
+            'mean_dice': mean_dice,
+            'per_class_iou': per_class_iou
+        })
+    
+    # Create a DataFrame and write to CSV
+    df = pd.DataFrame(results)
+    df.to_csv(output_csv, index=False)
+
+if PLOT:
+    model_dir = 'models/best'
+    output_csv = os.path.join(model_dir, 'test_results.csv')
+    model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
+    image_number = 0
+
+    for model_file in tqdm(model_files):
+        model_path = os.path.join(model_dir, model_file)
+        model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path, verbose=False)
+        
+        test_loader, image_paths = create_test_loader(model_tiles_dim, model_final_dim)
+
+        path_to_tiles = os.path.dirname(image_paths[0])
+
+        image_number = image_paths[0].split('_')[0]
+        
+        predict_and_plot_grid(
+            model=model,
+            config=config,
+            tiles_dim=model_tiles_dim,
+            image_number=image_number, 
+            path_to_tiles=path_to_tiles, 
+            colors=colors,
+            classes_df=labels_colors)
+
+# path_to_images = f'data/FloodNet/train/images'
+# path_to_masks = f'data/ColorMasks/TrainSet'
+# test_img_paths = sorted(glob.glob(os.path.join(path_to_images, '*')))
+# test_mask_paths = sorted(glob.glob(os.path.join(path_to_masks, '*')))
+# print(f'Found {len(test_img_paths)} images in the train set.')
+# for a in tqdm(range(5)):
+#     random_indices = np.random.choice(len(test_img_paths), size=12, replace=False)
+#     random_images = [test_img_paths[i] for i in random_indices]
+#     random_masks = [test_mask_paths[i] for i in random_indices]
+
+#     fig, axs = plt.subplots(3, 4, figsize=(15, 10))
+
+#     for folder in ['images', 'masks']:
+#         for i, img_path in enumerate(random_images if folder == 'images' else random_masks):
+#             row = i // 4
+#             col = i % 4
+#             img = mpimg.imread(img_path)
+#             axs[row, col].imshow(img)
+#             axs[row, col].axis('off')
+
+#         plt.tight_layout()
+#         plt.savefig(f'output/collection_{folder}_{a}.png')
+#         plt.show()
