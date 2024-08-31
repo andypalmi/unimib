@@ -316,7 +316,7 @@ def create_test_loader(tiles_dim, final_dim=256):
     # Create the Datasets
     test_ds = TilesDataset(test_split, transform=valtest_transform, tiles_dim=tiles_dim, tiles=False)
 
-    image_paths = test_ds.image_paths[0]
+    image_paths = np.array(test_ds.image_paths)[:, 0]
 
     # Create the DataLoaders
     num_workers = 12
@@ -367,26 +367,31 @@ if PLOT:
     model_dir = 'models/best'
     output_csv = os.path.join(model_dir, 'test_results.csv')
     model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
-    image_number = 0
+    sium = 5
+    for nr in tqdm(['287', '544'], ncols=100):
+        # random_number = np.random.randint(0, 100)
+        # random_number = '287'
+        # random_number = '544'
 
-    for model_file in tqdm(model_files):
-        model_path = os.path.join(model_dir, model_file)
-        model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path, verbose=False)
-        
-        test_loader, image_paths = create_test_loader(model_tiles_dim, model_final_dim)
+        for model_file in tqdm(model_files, ncols=100):
+            model_path = os.path.join(model_dir, model_file)
+            model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path, verbose=False)
+            
+            test_loader, image_paths = create_test_loader(model_tiles_dim, model_final_dim)
 
-        path_to_tiles = os.path.dirname(image_paths[0])
+            path_to_tiles = os.path.dirname(os.path.dirname(image_paths[0]))
 
-        image_number = image_paths[0].split('_')[0]
-        
-        predict_and_plot_grid(
-            model=model,
-            config=config,
-            tiles_dim=model_tiles_dim,
-            image_number=image_number, 
-            path_to_tiles=path_to_tiles, 
-            colors=colors,
-            classes_df=labels_colors)
+            # image_number = image_paths[nr].split('/')[-1].split('_')[0]
+            
+            predict_and_plot_grid(
+                model=model,
+                config=config,
+                tiles_dim=model_tiles_dim,
+                # image_number=image_number, 
+                image_number=nr, 
+                path_to_tiles=path_to_tiles, 
+                colors=colors,
+                classes_df=labels_colors)
 
 # path_to_images = f'data/FloodNet/train/images'
 # path_to_masks = f'data/ColorMasks/TrainSet'

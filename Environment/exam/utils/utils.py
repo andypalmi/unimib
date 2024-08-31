@@ -66,8 +66,8 @@ def load_tiles(
     image_number,
     path,
     tiles_dim=512,
-    rows=3,
-    cols=4
+    width=4,
+    height=3
 ):
     """
     Load image and mask tiles for a given image number.
@@ -76,18 +76,18 @@ def load_tiles(
         image_number: The number of the image.
         path: The path to the image and mask tiles.
         tiles_dim: The original size of the image tiles. Default is 512.
-        rows: The number of rows of tiles. Default is 3.
-        cols: The number of columns of tiles. Default is 4.
+        width: The number of columns of tiles. Default is 4.
+        height: The number of rows of tiles. Default is 3.
 
     Returns:
         tuple: A tuple containing arrays of image tiles and mask tiles.
     """
-    rows = 6000 // tiles_dim
-    cols = 6000 // tiles_dim
+    width = 6000 // tiles_dim
+    height = 4000 // tiles_dim
 
     image_tiles = []
     mask_tiles = []
-    for i in range(rows * cols):
+    for i in range(width * height):
         image_path = os.path.join(path, 'images', f'{image_number}_{i}.png')
         mask_path = os.path.join(path, 'masks', f'{image_number}_{i}.png')
         image_tiles.append(np.array(Image.open(image_path)))
@@ -98,8 +98,8 @@ def reconstruct_image(
     tiles,
     tiles_dim=512,
     final_dim=256,
-    rows=3,
-    cols=4,
+    width=4,
+    height=3,
     channels=3
 ):
     """
@@ -109,25 +109,25 @@ def reconstruct_image(
         tiles: The array of image tiles.
         tiles_dim: The original size of the image tiles. Default is 512.
         final_dim: The actual (px) size of each tile. Default is 256.
-        rows: The number of rows of tiles. Default is 3.
-        cols: The number of columns of tiles. Default is 4.
+        width: The number of columns of tiles. Default is 4.
+        height: The number of rows of tiles. Default is 3.
         channels: The number of channels in the image. Default is 3 (RGB).
 
     Returns:
         np.ndarray: The reconstructed image.
     """
 
-    rows = 6000 // tiles_dim
-    cols = 6000 // tiles_dim
+    width = 6000 // tiles_dim
+    height = 4000 // tiles_dim
 
     if channels == 3:
-        image = np.zeros((rows * final_dim, cols * final_dim, channels), dtype=tiles[0].dtype)
+        image = np.zeros((height * final_dim, width * final_dim, channels), dtype=tiles[0].dtype)
     else:
-        image = np.zeros((rows * final_dim, cols * final_dim), dtype=tiles[0].dtype)
+        image = np.zeros((height * final_dim, width * final_dim), dtype=tiles[0].dtype)
     
-    for i in range(rows):
-        for j in range(cols):
-            image[i*final_dim:(i+1)*final_dim, j*final_dim:(j+1)*final_dim] = tiles[i * cols + j]
+    for i in range(height):
+        for j in range(width):
+            image[i*final_dim:(i+1)*final_dim, j*final_dim:(j+1)*final_dim] = tiles[i * width + j]
     
     return image
 
@@ -163,7 +163,8 @@ def plot_grid(
     pred_probs,
     overlaid_img,
     diff_mask,
-    class_df
+    class_df,
+    tiles_dim=512
 ):
     """
     Plot a grid of images including the original image, true mask, predicted mask, 
@@ -179,8 +180,9 @@ def plot_grid(
         overlaid_img: The image with the predicted mask overlaid.
         diff_mask: The difference mask between the true and predicted masks.
         class_df: The dataframe containing the class information.
+        tiles_dim: The original size of the image tiles. Default is 512.
     """
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10), dpi=300)
     axes[0, 0].imshow(original_img)
     axes[0, 0].set_title('Original Image')
     
@@ -215,12 +217,12 @@ def plot_grid(
     # Add text with encoder name and tiles dimension
     encoder_name = config['encoder_name']
     encoder_name = 'ResNet34' if encoder_name == 'resnet34' else 'EfficientNet-B5' if encoder_name == 'efficientnet-b5' else 'MobileNetV2' if encoder_name == 'mobilenet_v2' else encoder_name
-    fig.text(0.5, 0.04, f"{encoder_name} {config['tiles_dim']} px", ha='center', fontsize=12)
+    fig.text(0.5, 0.04, f"{encoder_name} @ {tiles_dim} px", ha='center', fontsize=12)
 
     plt.tight_layout()
     plt.show()
 
-    plt.savefig(f"output/grid_{image_number}_{config['encoder_name']}_with_legend.png", bbox_inches='tight')
+    plt.savefig(f"output/grid_{image_number}_@{tiles_dim}px_{config['encoder_name']}_with_legend.png", bbox_inches='tight')
 
 def predict_and_plot_grid(
     model,
@@ -278,4 +280,4 @@ def predict_and_plot_grid(
 
     diff_mask = (((true_mask[:, :, 0] != pred_mask).astype(np.uint8) * 255) - 0) / 255 
 
-    plot_grid(image_number, config, original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask, classes_df)
+    plot_grid(image_number, config, original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask, classes_df, tiles_dim=tiles_dim)
