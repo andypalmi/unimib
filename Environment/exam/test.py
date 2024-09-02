@@ -11,16 +11,10 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print("Current working directory set to:", os.getcwd())
 
-import os
-
-# First path
-first_path = 'data/tiles_256/512x512/images/198_56.png'
-
-# Get the directory of the first path
-second_path = os.path.dirname(first_path)
-print(second_path)
-
-# Navigate up one more level to get the desired directory
-second_path = os.path.dirname(second_path)
-
-print(second_path)
+# freq = pd.read_csv('data/class_frequencies.csv')
+# freq = freq.sort_values('Frequency', ascending=False)
+# tot = freq['Frequency'].sum()
+# print(tot)
+# freq['%'] = round(freq['Frequency'] / tot * 100, 3)
+# print(freq)
+# freq.to_csv('data/frequencies.csv', index=False)

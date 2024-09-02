@@ -33,9 +33,9 @@ def read_class_colors(
     labels_colors['RGB'] = labels_colors[['r', 'g', 'b']].apply(tuple, axis=1)
     colors = np.array(labels_colors['RGB'].values)
 
-    # No conflicting labels found
-    # Therefore there are 23 classes in the dataset
-    nr_classes = len(labels_colors) - 1
+    # No conflicting labels were found during anaylysis, therefore there are 23 classes in the dataset
+    labels_colors = labels_colors[labels_colors['class'] != 'conflicting']
+    nr_classes = len(labels_colors)
     if verbose:
         print(f'Number of classes: {nr_classes}')
 
@@ -223,6 +223,7 @@ def plot_grid(
     plt.show()
 
     plt.savefig(f"output/grid_{image_number}_@{tiles_dim}px_{config['encoder_name']}_with_legend.png", bbox_inches='tight')
+    plt.close()
 
 def predict_and_plot_grid(
     model,
@@ -271,13 +272,15 @@ def predict_and_plot_grid(
             pred_prob_tiles.append(max_probs)
 
     pred_mask = reconstruct_image(np.array(pred_mask_tiles), tiles_dim=tiles_dim, final_dim=tile_size, channels=1)
-    pred_probs = ((reconstruct_image(np.array(pred_prob_tiles), tiles_dim=tiles_dim, final_dim=tile_size, channels=1) * 255) - 0) / 255
+    pred_probs = reconstruct_image(np.array(pred_prob_tiles), tiles_dim=tiles_dim, final_dim=tile_size, channels=1) * 255
+    pred_probs = (pred_probs - np.max(pred_probs)) / (np.max(pred_probs) - np.min(pred_probs))
     
     colorized_pred_mask = colorize_mask(pred_mask, colors)
 
-    alpha = 0.4
+    alpha = 0.6
     overlaid_img = cv2.addWeighted(original_img, 1-alpha, colorized_pred_mask, alpha, 0)
 
-    diff_mask = (((true_mask[:, :, 0] != pred_mask).astype(np.uint8) * 255) - 0) / 255 
+    diff_mask = (true_mask[:, :, 0] != pred_mask).astype(np.uint8) * 255
+    diff_mask = (diff_mask - np.min(diff_mask)) / (np.max(diff_mask) - np.min(diff_mask)) 
 
     plot_grid(image_number, config, original_img, colorized_true_mask, colorized_pred_mask, pred_probs, overlaid_img, diff_mask, classes_df, tiles_dim=tiles_dim)

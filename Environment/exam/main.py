@@ -60,6 +60,7 @@ val_split, test_split = train_test_split(valtest_split, test_size=0.5, random_st
 
 # Read class colors from CSV file
 labels_colors, colors, num_classes = read_class_colors('data/class_dict_seg.csv')
+print(labels_colors)
 
 # Get image and mask paths for tiles
 final_dim = 256
@@ -136,6 +137,7 @@ PROFILE = False
 TRAIN = False
 TEST = False
 PLOT = True
+CREATE_COLLECTION = False
 
 # Early stopping parameters
 PATIENCE = 10
@@ -393,26 +395,35 @@ if PLOT:
                 colors=colors,
                 classes_df=labels_colors)
 
-# path_to_images = f'data/FloodNet/train/images'
-# path_to_masks = f'data/ColorMasks/TrainSet'
-# test_img_paths = sorted(glob.glob(os.path.join(path_to_images, '*')))
-# test_mask_paths = sorted(glob.glob(os.path.join(path_to_masks, '*')))
-# print(f'Found {len(test_img_paths)} images in the train set.')
-# for a in tqdm(range(5)):
-#     random_indices = np.random.choice(len(test_img_paths), size=12, replace=False)
-#     random_images = [test_img_paths[i] for i in random_indices]
-#     random_masks = [test_mask_paths[i] for i in random_indices]
+if CREATE_COLLECTION:
+    path_to_images = f'data/original_images'
+    path_to_masks = f'data/RGB_color_image_masks'
+    test_img_paths = sorted(glob.glob(os.path.join(path_to_images, '*')))
+    test_mask_paths = sorted(glob.glob(os.path.join(path_to_masks, '*')))
+    print(f'Found {len(test_img_paths)} images.')
+    for a in tqdm(range(5)):
+        random_indices = np.random.choice(len(test_img_paths), size=6, replace=False)
+        random_images = [test_img_paths[i] for i in random_indices]
+        random_masks = [test_mask_paths[i] for i in random_indices]
 
-#     fig, axs = plt.subplots(3, 4, figsize=(15, 10))
+        fig, axs = plt.subplots(3, 4, figsize=(15, 10), dpi=150)
 
-#     for folder in ['images', 'masks']:
-#         for i, img_path in enumerate(random_images if folder == 'images' else random_masks):
-#             row = i // 4
-#             col = i % 4
-#             img = mpimg.imread(img_path)
-#             axs[row, col].imshow(img)
-#             axs[row, col].axis('off')
+        for i in tqdm(range(6)):
+            # Plot the image
+            img = mpimg.imread(random_images[i])
+            row = i // 2
+            col = (i % 2) * 2
+            axs[row, col].imshow(img)
+            axs[row, col].axis('off')
+            axs[row, col].set_title('Image')
 
-#         plt.tight_layout()
-#         plt.savefig(f'output/collection_{folder}_{a}.png')
-#         plt.show()
+            # Plot the corresponding mask
+            mask = mpimg.imread(random_masks[i])
+            axs[row, col + 1].imshow(mask)
+            axs[row, col + 1].axis('off')
+            axs[row, col + 1].set_title('Mask')
+
+        plt.tight_layout()
+        plt.savefig(f'output/collection_{a}.png')
+        plt.show()
+        plt.close()
