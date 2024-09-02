@@ -136,7 +136,7 @@ NUM_EPOCHS = 100
 PROFILE = False
 TRAIN = False
 TEST = False
-PLOT = True
+PLOT = False
 CREATE_COLLECTION = False
 
 # Early stopping parameters
@@ -394,6 +394,18 @@ if PLOT:
                 path_to_tiles=path_to_tiles, 
                 colors=colors,
                 classes_df=labels_colors)
+
+from utils.utils import plot_different_sizes
+
+PLOT_DIFFERENCE = True
+if PLOT_DIFFERENCE:
+    model_dir = 'models/best'
+    output_csv = os.path.join(model_dir, 'test_results.csv')
+    model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
+    for nr in tqdm(['287', '544'], ncols=100):
+        model_name = 'resnet34'
+        plot_different_sizes(model_files, model_name, nr)
+        
 
 if CREATE_COLLECTION:
     path_to_images = f'data/original_images'

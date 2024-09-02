@@ -7,6 +7,7 @@ import os
 import cv2
 import torch
 from torchvision.transforms import transforms
+from utils.evaluate import load_model_from_checkpoint
 
 def read_class_colors(
     file_path: str,
@@ -154,6 +155,67 @@ def colorize_mask(
 
 import matplotlib.patches as mpatches
 
+def plot_different_sizes(
+    model_paths,
+    model_name,
+    image_number,
+    device='cuda' if torch.cuda.is_available() else 'cpu'
+):
+    """
+    Plot the models predictions for different tile sizes in a single row.
+
+    Args:
+        model_paths (list): List of models to plot predictions for.
+        model_name (str): The name of the model.
+        image_number (int): The image number.
+        path_to_tiles (str): The path to the image tiles.
+        tile_sizes (list): List of tile sizes to plot.
+        device (str, optional): The device to use for prediction. Defaults to 'cuda' if available, else 'cpu'.
+
+    Returns:
+        None
+    """
+
+    diff_masks = []
+    tile_sizes = []
+
+    for model_path in model_paths:
+            model_path = os.path.join('models/best', model_path)
+            if model_name in model_path:
+                model, config, model_tiles_dim, model_final_dim = load_model_from_checkpoint(model_path, verbose=False)
+                print(f'Model tiles dim: {model_tiles_dim}, Model final dim: {model_final_dim}')
+                model.eval()
+                path_to_tiles = f'data/tiles_256/{model_tiles_dim}x{model_tiles_dim}'
+                image_tiles, mask_tiles = load_tiles(image_number, path_to_tiles, model_tiles_dim)
+                                                    
+                pred_mask_tiles, _ = get_pred_prob_tiles(model, image_tiles, device=device)
+
+                pred_mask = reconstruct_image(np.array(pred_mask_tiles), tiles_dim=model_tiles_dim, final_dim=model_final_dim, channels=1)
+
+                true_mask = reconstruct_image(mask_tiles, tiles_dim=model_tiles_dim, channels=3)
+                diff_mask = (true_mask[:, :, 0] != pred_mask).astype(np.uint8) * 255
+                diff_mask = (diff_mask - np.min(diff_mask)) / (np.max(diff_mask) - np.min(diff_mask))
+                diff_masks.append(diff_mask)
+                tile_sizes.append(model_tiles_dim)
+
+
+    fig, axes = plt.subplots(1, len(tile_sizes), figsize=(15, 5), dpi=300)
+    for i, (diff_mask, tiles_size) in enumerate(zip(diff_masks, tile_sizes)):
+        axes[i].imshow(diff_mask)
+        axes[i].set_title(f'{tiles_size} px')
+        axes[i].axis('off')
+
+    # Add text with encoder name
+    encoder_name = model_name
+    encoder_name = 'ResNet34' if encoder_name == 'resnet34' else 'EfficientNet-B5' if encoder_name == 'efficientnet-b5' else 'MobileNetV2' if encoder_name == 'mobilenet_v2' else encoder_name
+    fig.text(0.5, 0.04, f"{encoder_name}", ha='center', fontsize=12)
+
+    plt.tight_layout()
+    plt.show()
+
+    plt.savefig(f"output/different_sizes_{image_number}_{encoder_name}.png", bbox_inches='tight')
+    plt.close()
+    
 def plot_grid(
     image_number,
     config,
@@ -194,14 +256,14 @@ def plot_grid(
     
     im_pred_probs = axes[1, 0].imshow(pred_probs, cmap='afmhot')
     axes[1, 0].set_title('Model Confidence')
-    fig.colorbar(im_pred_probs, ax=axes[1, 0], orientation='vertical')
+    fig.colorbar(im_pred_probs, ax=axes[1, 0], location='bottom', shrink=0.5)
     
     axes[1, 1].imshow(overlaid_img)
     axes[1, 1].set_title('Mask Overlaid on Image')
     
     im_diff_mask = axes[1, 2].imshow(diff_mask, cmap='gray')
     axes[1, 2].set_title('Difference Mask')
-    fig.colorbar(im_diff_mask, ax=axes[1, 2], orientation='vertical')
+    fig.colorbar(im_diff_mask, ax=axes[1, 2], location='bottom', shrink=0.5)
     
     for ax in axes.flatten():
         ax.axis('off')
@@ -224,6 +286,28 @@ def plot_grid(
 
     plt.savefig(f"output/grid_{image_number}_@{tiles_dim}px_{config['encoder_name']}_with_legend.png", bbox_inches='tight')
     plt.close()
+
+def get_pred_prob_tiles(
+    model,
+    image_tiles,
+    device='cuda' if torch.cuda.is_available() else 'cpu'
+):
+    normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    model.to(device)
+
+    pred_mask_tiles, pred_prob_tiles = [], []
+    for tile in image_tiles:
+        tile_tensor = torch.tensor(tile).unsqueeze(0).permute(0, 3, 1, 2).float().to(device) / 255.0
+        tile_tensor = normalize(tile_tensor)
+        with torch.no_grad():
+            output = model(tile_tensor)
+            pred_probs = torch.softmax(output, dim=1).squeeze(0)
+            pred_mask = torch.argmax(pred_probs, dim=0).cpu().numpy()
+            pred_mask_tiles.append(pred_mask)
+            max_probs = pred_probs.max(0)[0].cpu().numpy()
+            pred_prob_tiles.append(max_probs)
+    
+    return pred_mask_tiles, pred_prob_tiles
 
 def predict_and_plot_grid(
     model,
@@ -257,23 +341,11 @@ def predict_and_plot_grid(
     
     colorized_true_mask = colorize_mask(true_mask, colors)
 
-    normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-
-    pred_mask_tiles, pred_prob_tiles = [], []
-    for tile in image_tiles:
-        tile_tensor = torch.tensor(tile).unsqueeze(0).permute(0, 3, 1, 2).float().to(device) / 255.0
-        tile_tensor = normalize(tile_tensor)
-        with torch.no_grad():
-            output = model(tile_tensor)
-            pred_probs = torch.softmax(output, dim=1).squeeze(0)
-            pred_mask = torch.argmax(pred_probs, dim=0).cpu().numpy()
-            pred_mask_tiles.append(pred_mask)
-            max_probs = pred_probs.max(0)[0].cpu().numpy()
-            pred_prob_tiles.append(max_probs)
+    pred_mask_tiles, pred_prob_tiles = get_pred_prob_tiles(model, image_tiles, device=device)
 
     pred_mask = reconstruct_image(np.array(pred_mask_tiles), tiles_dim=tiles_dim, final_dim=tile_size, channels=1)
     pred_probs = reconstruct_image(np.array(pred_prob_tiles), tiles_dim=tiles_dim, final_dim=tile_size, channels=1) * 255
-    pred_probs = (pred_probs - np.max(pred_probs)) / (np.max(pred_probs) - np.min(pred_probs))
+    pred_probs = (pred_probs - np.min(pred_probs)) / (np.max(pred_probs) - np.min(pred_probs))
     
     colorized_pred_mask = colorize_mask(pred_mask, colors)
 
