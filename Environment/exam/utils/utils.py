@@ -199,9 +199,11 @@ def plot_different_sizes(
                 tile_sizes.append(model_tiles_dim)
 
 
-    fig, axes = plt.subplots(1, len(tile_sizes), figsize=(15, 5), dpi=300)
-    for i, (diff_mask, tiles_size) in enumerate(zip(diff_masks, tile_sizes)):
-        axes[i].imshow(diff_mask)
+    fig, axes = plt.subplots(1, len(tile_sizes), figsize=(16, 4), dpi=300)
+    zipped = zip(diff_masks, tile_sizes)
+    zipped = sorted(zipped, key=lambda x: x[1])
+    for i, (diff_mask, tiles_size) in enumerate(zipped):
+        axes[i].imshow(diff_mask, cmap='gray')
         axes[i].set_title(f'{tiles_size} px')
         axes[i].axis('off')
 
