@@ -27,7 +27,7 @@ from utils.TilesDataset import TilesDataset
 from utils.transforms import train_transform, valtest_transform
 from utils.metrics import compute_metrics_torch
 from utils.train import train, validate
-from utils.utils import save_profiling_tables, predict_and_plot_grid
+from utils.utils import save_profiling_tables, predict_and_plot_grid, plot_different_sizes
 from utils.train import save_model, save_model_stats, read_csv_with_empty_handling, initialize_best_val_loss
 from utils.evaluate import load_model_from_checkpoint, evaluate_model
 
@@ -138,6 +138,7 @@ TRAIN = False
 TEST = False
 PLOT = False
 CREATE_COLLECTION = False
+PLOT_DIFFERENCE = True
 
 # Early stopping parameters
 PATIENCE = 10
@@ -371,9 +372,6 @@ if PLOT:
     model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
     sium = 5
     for nr in tqdm(['287', '544'], ncols=100):
-        # random_number = np.random.randint(0, 100)
-        # random_number = '287'
-        # random_number = '544'
 
         for model_file in tqdm(model_files, ncols=100):
             model_path = os.path.join(model_dir, model_file)
@@ -383,27 +381,21 @@ if PLOT:
 
             path_to_tiles = os.path.dirname(os.path.dirname(image_paths[0]))
 
-            # image_number = image_paths[nr].split('/')[-1].split('_')[0]
-            
             predict_and_plot_grid(
                 model=model,
                 config=config,
                 tiles_dim=model_tiles_dim,
-                # image_number=image_number, 
                 image_number=nr, 
                 path_to_tiles=path_to_tiles, 
                 colors=colors,
                 classes_df=labels_colors)
 
-from utils.utils import plot_different_sizes
-
-PLOT_DIFFERENCE = True
 if PLOT_DIFFERENCE:
     model_dir = 'models/best'
     output_csv = os.path.join(model_dir, 'test_results.csv')
     model_files = [f for f in os.listdir(model_dir) if f.endswith('.pt')]
     for nr in tqdm(['287', '544'], ncols=100):
-        model_name = 'resnet34'
+        model_name = 'mobilenet_v2'
         plot_different_sizes(model_files, model_name, nr)
         
 

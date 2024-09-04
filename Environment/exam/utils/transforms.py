@@ -19,8 +19,6 @@ train_transform = A.Compose([
 ])
 
 valtest_transform = A.Compose([
-    A.HorizontalFlip(p=0.5),  # Apply horizontal flip with 50% probability
-    A.VerticalFlip(p=0.5),  # Apply vertical flip with 50% probability
     A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),  # Normalize the image
     ToTensorV2(),  # Convert image and mask to PyTorch tensors
 ])

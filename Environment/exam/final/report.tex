@@ -45,12 +45,14 @@ The primary objective of this study is to evaluate the suitability of various en
 \subsection{Dataset Description}
 The dataset used is the \textit{Semantic Drone Dataset}, a collection of high-resolution aerial imagery captured from a bird's-eye perspective of urban scenes. The images were captured using a resolution of 24 megapixels, resulting in images 6000x4000 pixels. A sample of the images and masks is shown in Figure [\ref{fig:collection_1}]. The imagery in the dataset was captured at varying altitudes, ranging from 5 to 30 meters above ground level. This diversity in altitude provides a rich set of perspectives, allowing us to train models that can adapt to different flight heights and scenarios. 400 public images are available for training, while the author reserves 200 images as a private test set. This dataset offers a unique opportunity to develop models capable of improving the capability of autonomous drones in navigating safely in urban settings. More information on this dataset is available at \url{http://dronedataset.icg.tugraz.at}. 
 
-\begin{figure}
+\begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=\linewidth]{images/collection_1.png}
+    \includegraphics[width=0.7\linewidth]{images/collection_1.png}
     \caption{Sample images and respective masks of the Semantic Drone Dataset.}
     \label{fig:collection_1}
-\end{figure}
+    \vspace{5pt}   
+\end{figure*}
+
 
 \subsection{Data Analysis and Preprocessing}
 \subsection{Class Frequencies}
@@ -96,17 +98,17 @@ The dataset contains 23 classes, and their frequencies are shown in Table \ref{t
 The preprocessing of the dataset involved several steps to prepare the images for training. Initially, images were loaded and resized by rounding them down to the nearest multiple of the desired tile size. Various tile sizes were utilized, including 512, 768, 1000, and 2000 pixels. The number of tiles for each image and the total number of images for each tile size is shown in Table [\ref{table:number_of_tiles_and_total_tiles}]. After creating the tiles of different sizes, all tiles were further resized to 256x256 pixels to ensure consistency and computational efficiency during training. This tiling strategy allowed the model to process the images effectively by breaking them down into manageable segments, enhancing its ability to generalize across different regions of the images. The resized 256x256 pixels tiles were saved on disk, enabling faster data loading and processing during training, rather than performing tiling on-the-fly at each iteration.
 
 \begin{table}[h]
-\centering
-\begin{tabular}{|c|c|c|}
-\hline
-\textbf{Tile Size (px)} & \textbf{Tiles/image} & \textbf{Total tiles} \\ \hline
-512 x 512 & 77 & 30,800 \\ \hline
-768 x 768 & 35 & 14,000 \\ \hline
-1,000 x 1,000 & 24 & 9,600 \\ \hline
-2,000 x 2,000 & 6 & 2,400 \\ \hline
-\end{tabular}
-\caption{Number of tiles per image and total tiles for tile size.}
-\label{table:number_of_tiles_and_total_tiles}
+    \centering
+    \begin{tabular}{|c|c|c|}
+    \hline
+    \textbf{Tile Size (px)} & \textbf{Tiles/image} & \textbf{Total tiles} \\ \hline
+    512 x 512 & 77 & 30,800 \\ \hline
+    768 x 768 & 35 & 14,000 \\ \hline
+    1,000 x 1,000 & 24 & 9,600 \\ \hline
+    2,000 x 2,000 & 6 & 2,400 \\ \hline
+    \end{tabular}
+    \caption{Number of tiles per image and total tiles for tile size.}
+    \label{table:number_of_tiles_and_total_tiles}
 \end{table}
 
 \subsubsection{Image Augmentations}
@@ -166,7 +168,7 @@ For the evaluation of the trained models, several metrics are computed to compre
 
 \section{Results}
 \subsection{Comparison of Accuracy, mean IoU and mean Dice}
-The performance analysis across different encoders and tile dimensions, shown in Table \ref{table:performance_metrics}, reveals that \textbf{all the models performed the best with tiles of 512x512 pixels.}
+The performance analysis across different encoders and tile dimensions, shown in Table \ref{table:performance_metrics}, reveals that \textbf{all models performed best with tiles of 512x512 pixels.}
 
 Among the models, \textit{EfficientNet-B5} delivered the highest scores across all metrics. At 512x512 pixels, EfficientNet-B5 recorded an accuracy of 93.32\%, an mIoU of 88.87\%, and a mean Dice coefficient of 93.24\%. These results indicate that EfficientNet-B5 is highly effective at capturing detailed features, making it particularly suitable for tasks requiring high precision.
 
@@ -177,6 +179,7 @@ ResNet34 also performed well, particularly at the 512x512 pixel tile size, with 
 \begin{table}[htbp]
     \centering
     \small
+    \setlength{\tabcolsep}{3pt} % Adjust the value as needed
     \begin{tabular}{|l|r|r|r|r|}
     \hline
     \textbf{Encoder} & \textbf{Tiles} & \textbf{Accuracy} & \textbf{mIoU} & \textbf{mDice} \\ \hline
@@ -202,7 +205,7 @@ The per-class Intersection over Union (IoU) analysis provides a detailed compari
 
 EfficientNet-B5 consistently outperformed the other models in most classes, achieving the highest IoU in 13 out of the 23 classes. ResNet34 also performed well, particularly in classes such as 'dirt' and 'pool,' where it marginally surpassed EfficientNet-B5.
 
-\textit{MobileNetV2 delivered remarkably close results to the other two models}, despite being the smallest model with only 3.4 million parameters. In many classes, the IoU difference between MobileNetV2 and the best-performing model was minimal, often within 1\%. This \textit{balance} between model size and performance underscores MobileNetV2’s potential for deployment in resource-constrained environments, such as drones, where both computational efficiency and high segmentation accuracy are essential.
+\textbf{MobileNetV2 delivered remarkably close results to the other two models}, despite being the smallest model with only 3.4 million parameters. In many classes, the IoU difference between MobileNetV2 and the best-performing model was minimal, often within 1\%. This \textit{balance} between model size and performance underscores MobileNetV2’s potential for deployment in resource-constrained environments, such as drones, where both computational efficiency and high segmentation accuracy are essential.
 
 \begin{table}[htbp]
     \centering
@@ -241,65 +244,31 @@ EfficientNet-B5 consistently outperformed the other models in most classes, achi
 
 \subsection{Qualitative Results}
 
-Figures [\ref{fig:grid_287_@512px_efficientnet-b5_with_legend}], [\ref{fig:grid_287_@512px_resnet34_with_legend}], and [\ref{fig:grid_287_@512px_mobilenet_v2_with_legend}] present a qualitative comparison of the segmentation performance of EfficientNet-B5, ResNet34, and MobileNetV2, respectively, using 512x512 pixel tiles. Each figure displays a 2x3 grid layout, comprising the original image, ground truth mask, predicted mask, model confidence map, overlaid mask on the original image, and a difference mask that highlights the regions of incorrect predictions.
+Figure [\ref{fig:grids_544_combined}] provides a qualitative comparison of the segmentation performance of EfficientNet-B5, ResNet34, and MobileNetV2 using 512x512 pixel tiles. Each figure features a 2x3 grid layout that includes the original image, ground truth mask, predicted mask, model confidence map, overlaid mask on the original image, and a difference mask highlighting regions of incorrect predictions.
 
-\textit{Both EfficientNet-B5 and MobileNetV2 demonstrate a high degree of accuracy in their predicted masks}. The difference masks reveal that most misclassifications happen along the object boundaries, which are typically challenging areas for segmentation models. Notably, MobileNetV2, despite its smaller size, delivers competitive performance that is comparable to its more complex counterparts, underscoring its efficiency and potential applicability in resource-constrained environments such as deployment on drones.
+\textbf{Both EfficientNet-B5 and MobileNetV2 exhibit a high level of accuracy in their predicted masks}. The difference masks show that most misclassifications occur along object boundaries, which are notoriously difficult areas for segmentation models. Additionally, as shown in Figure [\ref{fig:different_sizes_combined}], the accuracy around object edges tends to decrease with increasing tile dimensions. This decline in performance could be attributed to the small size of objects within the classes, especially when viewed from a high altitude. Furthermore, resizing larger tiles to 256x256 pixels may result in a greater loss of information, amplifying this issue.
+
+Despite its smaller size, MobileNetV2 delivers performance that is on par with its more complex counterparts, highlighting its efficiency and suitability for resource-constrained environments, such as deployment on drones.
 
 \begin{figure*}[!htbp]
     \centering
-    \begin{minipage}{\textwidth}
-        \centering
-        \includegraphics[width=0.8\textwidth]{images/grid_544_512px_efficientnet-b5_with_legend.png}
-        \caption{EfficientNet-B5 @ 512 pixels: Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask.}
-        \label{fig:grid_544_@512px_efficientnet-b5_with_legend}
-    \end{minipage}
-    
-    \vspace{0pt} % Add some space between figures if needed
-    
-    \begin{minipage}{\textwidth}
-        \centering
-        \includegraphics[width=0.8\textwidth]{images/grid_544_512px_resnet34_with_legend.png}
-        \caption{ResNet34 @ 512 pixels: Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask.}
-        \label{fig:grid_544_@512px_resnet34_with_legend}
-    \end{minipage}
-    
-    \vspace{0pt} % Add some space between figures if needed
-    
-    \begin{minipage}{\textwidth}
-        \centering
-        \includegraphics[width=0.8\textwidth]{images/grid_544_512px_mobilenet_v2_with_legend.png}
-        \caption{MobileNetV2 @ 512 pixels: Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask.}
-        \label{fig:grid_544_@512px_mobilenet_v2_with_legend}
-    \end{minipage}
+    \includegraphics[width=0.8\textwidth]{images/grid_544_512px_efficientnet-b5_with_legend.png}
+    \includegraphics[width=0.8\textwidth]{images/grid_544_512px_resnet34_with_legend.png}
+    \includegraphics[width=0.8\textwidth]{images/grid_544_512px_mobilenet_v2_with_legend.png}
+    \caption{Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask for the three models:  EfficientNet-B5 (top), ResNet34 (middle), and MobileNetV2 (bottom). Tiles dimension of 512x512 pixels.}
+    \label{fig:grids_544_combined}
+    \vspace{10pt}
 \end{figure*}
 
-% \begin{figure*}[!htbp]
-%     \centering
-%     \begin{minipage}{\textwidth}
-%         \centering
-%         \includegraphics[width=0.8\textwidth]{images/grid_544_768px_efficientnet-b5_with_legend.png}
-%         \caption{EfficientNet-B5 @ 768 pixels: Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask.}
-%         \label{fig:grid_544_@768px_efficientnet-b5_with_legend}
-%     \end{minipage}
-    
-%     \vspace{0pt} % Add some space between figures if needed
-    
-%     \begin{minipage}{\textwidth}
-%         \centering
-%         \includegraphics[width=0.8\textwidth]{images/grid_544_768px_resnet34_with_legend.png}
-%         \caption{ResNet34 @ 768 pixels: Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask.}
-%         \label{fig:grid_544_@768px_resnet34_with_legend}
-%     \end{minipage}
-    
-%     \vspace{0pt} % Add some space between figures if needed
-    
-%     \begin{minipage}{\textwidth}
-%         \centering
-%         \includegraphics[width=0.8\textwidth]{images/grid_544_768px_mobilenet_v2_with_legend.png}
-%         \caption{MobileNetV2 @ 768 pixels: Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask.}
-%         \label{fig:grid_544_@768px_mobilenet_v2_with_legend}
-%     \end{minipage}
-% \end{figure*}
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=\textwidth]{images/different_sizes_544_EfficientNet-B5.png}
+    \includegraphics[width=\textwidth]{images/different_sizes_544_ResNet34.png}
+    \includegraphics[width=\textwidth]{images/different_sizes_544_MobileNetV2.png}
+    \caption{Segmentation performance difference over increasing tile dimensions for three models: EfficientNet-B5 (top), ResNet34 (middle), and MobileNetV2 (bottom).}
+    \label{fig:different_sizes_combined}
+    \vspace{10pt}
+\end{figure*}
 
 \section{Discussion on Drone Deployment}
 
@@ -319,14 +288,22 @@ Another viable strategy is to decrease the frame rate of the drone’s camera. S
 
 Model quantization is an effective technique to address the computational challenges of deploying neural networks on drones. This process involves converting a model’s floating-point weights and activations into lower precision formats, such as integers, which reduces both the model’s size and its computational requirements \cite{han2016}. Quantization enhances the model’s efficiency, making it more suitable for real-time applications on resource-constrained devices like drones. In addition to quantization, model pruning is a valuable technique. This method reduces the number of connections within the network by keeping only the most essential ones, thus simplifying the model.
 
-\textit{The deep compression technique \cite{han2016}, which combines pruning, quantization, and Huffman coding, can substantially reduce the storage and computational needs of neural networks.} Pruning alone can decrease the number of connections by 9× to 13×, and quantization can further compress the model by reducing the bit-width of weights from 32 bits to as few as 5 bits, significantly decreasing model size.
+\textbf{The deep compression technique \cite{han2016}, which combines pruning, quantization, and Huffman coding, can substantially reduce the storage and computational needs of neural networks.} Pruning alone can decrease the number of connections by 9× to 13×, and quantization can further compress the model by reducing the bit-width of weights from 32 bits to as few as 5 bits, significantly decreasing model size.
 
 For example, the deep compression technique has demonstrated a reduction in model storage by 35× for AlexNet, from 240MB to 6.9MB, and by 49× for VGG-16, from 552MB to 11.3MB, without sacrificing accuracy. This compression allows models to fit within on-chip SRAM caches rather than relying on off-chip DRAM memory. Additionally, compressed models exhibit 3× to 4× layer-wise speedup and 3× to 7× improvements in energy efficiency, which translates to enhanced battery life and computational performance on various hardware platforms, including mobile GPUs \cite{han2016}.
 
 Incorporating these compression techniques can make models like MobileNetV2 more viable for drone deployment, optimizing both computational efficiency and practical application.
 
+\subsection{Specifically designed workstations}
+
+A final solution could be to deploy the models on workstations specifically designed for edge devices. These tailored workstations, such as the Jetson AGX Xavier, offer a balance between performance and power efficiency, making them ideal for real-time processing in resource-constrained environments. The Jetson AGX Xavier, for instance, is an AI hardware platform designed for autonomous machines, offering the performance of a GPU workstation in a compact form factor with power consumption under 30W. This platform is particularly well-suited for drones, robots, and other autonomous systems, providing the necessary computational power to run deep learning models like MobileNetV2 while maintaining operational efficiency in the field \cite{tran2022}.
+
+In support of this, Safavi et al. \cite{safavi2023efficientsemanticsegmentationedge} demonstrated the potential of such workstations by training a UNet model with MobileNetV2 as the encoder and converting it to TensorRT engines. Their study involved iterating through 1,000 static frames over 20 rounds on a Jetson workstation, yielding an inference rate of 15 FPS with a latency of 0.07 seconds and an average power consumption of just 5.9 watts. These results indicate that deploying deep learning models on specifically designed edge workstations is feasible and effective.
+
+Moreover, combining these workstations with model quantization could further enhance the model’s inference capability, with only a minor loss in accuracy. Quantization would reduce the computational load and power requirements even further, making it a compelling approach for optimizing real-time performance on drones and other autonomous platforms.
+
 \section{Discussion on Tile Size}
-\textbf{Small Tile Size Wins: }All models performed best with tiles of 512x512 pixels, indicating that smaller tile sizes are more effective for capturing detailed features and improving segmentation accuracy. Many classes in the dataset consist of small objects at the drone altitude (e.g., person, window, door, dog). Given that all tiles are resized to 256x256 pixels, the 512x512 pixel tiles capture the most detailed features. However, a larger tile size (for example, 768x768 pixels) could provide a better balance in terms of computational requirements and accuracy, as it reduces the number of tiles per image by half, resulting in only about a 1\% decrease in performance (35 tiles at 768x768 pixels versus 77 tiles at 512x512 pixels). Increasing the tile size further to 1,000x1,000 pixels could lower the computational requirements of the network by a factor of 3, decreasing the number of tiles from 77 per image to 24. This reduction would lead to higher frames per second (FPS) for detection. The choice of optimal tile dimensions ultimately depends on the application's priorities: whether to prioritize higher accuracy at the expense of FPS or to accept slightly lower accuracy for improved FPS.
+\textbf{Small Tile Size Wins:} All models performed best with tiles of 512x512 pixels, indicating that smaller tile sizes are more effective for capturing detailed features and improving segmentation accuracy. Many classes in the dataset consist of small objects at the drone altitude (e.g., person, window, door, dog). Given that all tiles are resized to 256x256 pixels, the 512x512 pixel tiles capture the most detailed features. However, a larger tile size (for example, 768x768 pixels) could provide a better balance in terms of computational requirements and accuracy, as it reduces the number of tiles per image by half, resulting in only about a 1\% decrease in performance (35 tiles at 768x768 pixels versus 77 tiles at 512x512 pixels). Increasing the tile size further to 1,000x1,000 pixels could lower the computational requirements of the network by a factor of 3, decreasing the number of tiles from 77 per image to 24. This reduction would lead to higher frames per second (FPS) for detection. The choice of optimal tile dimensions ultimately depends on the application's priorities: whether to prioritize higher accuracy at the expense of FPS or to accept slightly lower accuracy for improved FPS.
 
 \section{Conclusion}
 This study conducted a comprehensive evaluation of the DeepLabv3+ architecture using EfficientNet-B5, ResNet34, and MobileNetV2 encoders for semantic segmentation of urban drone imagery, focusing on the Semantic Drone Dataset. Our findings reveal several key insights:
@@ -334,12 +311,14 @@ This study conducted a comprehensive evaluation of the DeepLabv3+ architecture u
 \begin{itemize}
     \item \textbf{Small Tile Size Wins:} All models performed best with tiles of 512x512 pixels. However, these tile dimensions impose significant computational requirements due to the high number of tiles per image (77 tiles). Larger tile sizes, such as 768x768 pixels or 1,000x1,000 pixels, offer nearly equivalent performance while reducing the number of tiles per image by a factor of 2 or 3, respectively, thereby maintaining high performance with lower computational demands.
     \item \textbf{EfficientNet-B5} consistently delivered the highest scores across all metrics, achieving an accuracy of 93.32\%, an mIoU of 88.87\%, and a mean Dice coefficient of 93.24\% at 512x512 pixels. \textbf{ResNet34} followed closely, with an accuracy of 93.27\%, an mIoU of 88.64\%, and a mean Dice coefficient of 93.05\%. However, these larger models are not fit for running on drones due to the limited computing power and battery on-board.
-    \item \textbf{MobileNetV2} demonstrated a remarkable balance between performance and efficiency, achieving an accuracy of 92.89\%, an mIoU of 88.04\%, and a mean Dice coefficient of 92.65\% at 512x512 pixels. The differences in performance metrics between EfficientNet-B5 and MobileNetV2 are shown in Table [\ref{tab:delta_table}], with the delta consistently smaller than 1\%. Despite its lighter architecture, MobileNetV2's performance was impressively close to that of EfficientNet-B5, making it particularly well-suited for applications in drone autonomous driving that require rapid, on-the-fly image analysis.
+    \item \textbf{MobileNetV2} demonstrated a remarkable balance between performance and efficiency, achieving an accuracy of 92.89\%, an mIoU of 88.04\%, and a mean Dice coefficient of 92.65\% at 512x512 pixels. The differences in performance metrics between EfficientNet-B5 and MobileNetV2 are shown in Table [\ref{tab:delta_table}], with the delta of performance consistently smaller than 1\%. Despite its lighter architecture, MobileNetV2's performance was impressively close to that of EfficientNet-B5, making it particularly well-suited for applications in drone autonomous driving that require rapid, on-the-fly image analysis.
 \end{itemize}
 
 \begin{table}[!htbp]
     \centering
-    \begin{tabular}{|c|r|r|r|}
+    \small
+    \setlength{\tabcolsep}{5pt} % Adjust the value as needed
+    \begin{tabular}{|l|r|r|r|}
     \hline
      Metric    &  EffNet-B5 & MobNetV2 & Delta \\ \hline
      Accuracy    &  93.32 & 92.89 & 0.43 \\ \hline
@@ -350,17 +329,19 @@ This study conducted a comprehensive evaluation of the DeepLabv3+ architecture u
     \label{tab:delta_table}
 \end{table}
 
-However, deploying MobileNetV2 on drones presents challenges due to the limited on-board resources. To address this, the following possible solutions require further studies and testing:
+However, deploying MobileNetV2 on drones presents challenges due to the limited on-board resources. Safavi et al. \cite{safavi2023efficientsemanticsegmentationedge} have demonstrated that deploying MobileNetV2 on drones is feasible using specifically designed workstations like the Jetson AGX Xavier. Their study showed that MobileNetV2 could achieve real-time performance with acceptable power consumption, making it a strong candidate for drone applications. 
+
+To further enhance MobileNetV2's deployment on drones, several strategies should be explored:
 
 \begin{itemize}
-    \item Implementing remote image processing to offload computational tasks to ground stations or cloud servers.
-    \item Reducing frame rates to decrease computational load while maintaining effective segmentation for slowly changing scenes.
-    \item Applying model quantization and pruning techniques to further optimize model size and computational efficiency without significant loss in accuracy.
+    \item \textbf{Remote Image Processing:} Offloading computational tasks to ground stations or cloud servers can reduce the on-board computational burden.
+    \item \textbf{Frame Rate Reduction:} Lowering the frame rate can decrease the computational load while still providing effective segmentation in slowly changing environments.
+    \item \textbf{Model Quantization and Pruning:} These techniques can optimize model size and computational efficiency, potentially improving inference times and reducing power consumption with minimal impact on accuracy.
 \end{itemize}
 
-These strategies can help bridge the gap between the high accuracy of larger models like EfficientNet-B5 or ResNet34 and the computational requirements of drone-based applications.
+These strategies can help bridge the gap between the high accuracy of larger models like EfficientNet-B5 or ResNet34 and the computational limitations of drone-based applications.
 
-In conclusion, while EfficientNet-B5 offers marginally superior segmentation accuracy, MobileNetV2 emerges as a highly promising solution for drone-based urban imagery analysis. Its balance of efficiency and performance, coupled with appropriate deployment strategies, positions it well for real-world applications of autonomous navigation of drones in urban areas, such as for drone deliveries, and for infrastructure inspection. Future research should focus on further optimizing these models for edge devices and exploring hybrid approaches that combine the strengths of different architectures for specific deployment scenarios.
+In conclusion, while EfficientNet-B5 offers marginally superior segmentation accuracy, MobileNetV2 emerges as a highly promising solution for drone-based urban imagery analysis. Its balance of efficiency and performance, coupled with appropriate deployment strategies, positions it well for real-world applications, such as autonomous drone navigation, drone deliveries, and infrastructure inspection. Future research should focus on further optimizing these models for edge devices and for specifically designed workstations.
 
 \bibliographystyle{ieeetr} % or any other style you prefer, like plain, alpha, etc.
 \bibliography{references}
