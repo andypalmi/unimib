@@ -1,0 +1,44 @@
+\begin{thebibliography}{1}
+
+\bibitem{deeplabv3plus2018}
+L.-C. Chen, Y.~Zhu, G.~Papandreou, F.~Schroff, and H.~Adam, ``Encoder-decoder
+  with atrous separable convolution for semantic image segmentation,'' in {\em
+  Proceedings of the European Conference on Computer Vision (ECCV)},
+  pp.~833--851, 2018.
+
+\bibitem{deeplab2016}
+L.-C. Chen, G.~Papandreou, I.~Kokkinos, K.~Murphy, and A.~Yuille, ``Deeplab:
+  Semantic image segmentation with deep convolutional nets, atrous convolution,
+  and fully connected crfs,'' {\em IEEE Transactions on Pattern Analysis and
+  Machine Intelligence}, vol.~PP, 06 2016.
+
+\bibitem{efficientnet2019}
+M.~Tan and Q.~V. Le, ``Efficientnet: Rethinking model scaling for convolutional
+  neural networks,'' in {\em Conference: 2019 International Conference on
+  Machine Learning ICML}, 2019.
+
+\bibitem{resnet2016}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun, ``Deep residual learning for image
+  recognition,'' in {\em Proceedings of the IEEE Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pp.~770--778, 2016.
+
+\bibitem{mobilenetv22018}
+M.~Sandler, A.~Howard, M.~Zhu, A.~Zhmoginov, and L.-C. Chen, ``Mobilenetv2:
+  Inverted residuals and linear bottlenecks,'' in {\em Proceedings of the IEEE
+  Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pp.~4510--4520, 2018.
+
+\bibitem{han2016}
+S.~Han, H.~Mao, and W.~Dally, ``Deep compression: Compressing deep neural
+  networks with pruning, trained quantization and huffman coding,'' in {\em
+  Conference: 2016 International Conference on Learning Representations ICLR},
+  10 2016.
+
+\bibitem{tran2022}
+T.~Tommy, ``Semantic segmentation using deep neural networks for mavs.,'' 2022.
+
+\bibitem{safavi2023efficientsemanticsegmentationedge}
+F.~Safavi, I.~Ali, V.~Dasari, G.~Song, T.~Zhu, and M.~Rahnemoonfar, ``Efficient
+  semantic segmentation on edge devices,'' 2023.
+
+\end{thebibliography}

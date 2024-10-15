@@ -1,0 +1,72 @@
+\relax 
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Background}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}Objectives}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Dataset}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Dataset Description}{1}{}\protected@file@percent }
+\citation{deeplabv3plus2018}
+\citation{deeplab2016}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Data Analysis and Preprocessing}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Class Frequencies}{2}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Class frequencies and percentages.}}{2}{}\protected@file@percent }
+\newlabel{table:class_frequencies}{{1}{2}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.1}Tiling}{2}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Number of tiles per image and total tiles for tile size.}}{2}{}\protected@file@percent }
+\newlabel{table:number_of_tiles_and_total_tiles}{{2}{2}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.3.2}Image Augmentations}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methodology}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Network Architecture: DeepLabv3+}{2}{}\protected@file@percent }
+\citation{efficientnet2019}
+\citation{resnet2016}
+\citation{mobilenetv22018}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Sample images and respective masks of the Semantic Drone Dataset.}}{3}{}\protected@file@percent }
+\newlabel{fig:collection_1}{{1}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Encoders}{3}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Number of trainable parameters}}{3}{}\protected@file@percent }
+\newlabel{table:encoders}{{3}{3}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.1}EfficientNetB5}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.2}ResNet34}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {3.2.3}MobileNetV2}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Training}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Evaluation Metrics}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Comparison of Accuracy, mean IoU and mean Dice}{4}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Final performance metrics for different encoders and tiles dimensions in pixel. Accuracy, weighted mean IoU (mIoU) and weighted mean Dice (mDice) are expressed as percentages \%.}}{4}{}\protected@file@percent }
+\newlabel{table:performance_metrics}{{4}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Comparison of Per-class IoU}{4}{}\protected@file@percent }
+\citation{han2016}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Per class IoU comparison for EfficientNet-B5, ResNet34, and MobileNetV2. Values are expressed as percentages.}}{5}{}\protected@file@percent }
+\newlabel{table:per_class_iou}{{5}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Qualitative Results}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion on Drone Deployment}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Remote Image Processing}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Frame Rate Reduction}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Model Quantization}{5}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Original Image, Ground Truth Mask, Predicted Mask, Model Confidence, Overlaid Mask, and Difference Mask for the three models: EfficientNet-B5 (top), ResNet34 (middle), and MobileNetV2 (bottom). Tiles dimension of 512x512 pixels.}}{6}{}\protected@file@percent }
+\newlabel{fig:grids_544_combined}{{2}{6}}
+\citation{han2016}
+\citation{han2016}
+\citation{tran2022}
+\citation{safavi2023efficientsemanticsegmentationedge}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Segmentation performance difference over increasing tile dimensions for three models: EfficientNet-B5 (top), ResNet34 (middle), and MobileNetV2 (bottom).}}{7}{}\protected@file@percent }
+\newlabel{fig:different_sizes_combined}{{3}{7}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Specifically designed workstations}{7}{}\protected@file@percent }
+\citation{safavi2023efficientsemanticsegmentationedge}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion on Tile Size}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{8}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Performance comparison across different metrics (expressed as percentages \%) of EfficientNet-B5 and MobileNetV2 with tiles of 512x512 pixels. Notice that the delta is smaller than 1\%.}}{8}{}\protected@file@percent }
+\newlabel{tab:delta_table}{{6}{8}}
+\bibstyle{ieeetr}
+\bibdata{references}
+\bibcite{deeplabv3plus2018}{1}
+\bibcite{deeplab2016}{2}
+\bibcite{efficientnet2019}{3}
+\bibcite{resnet2016}{4}
+\bibcite{mobilenetv22018}{5}
+\bibcite{han2016}{6}
+\bibcite{tran2022}{7}
+\bibcite{safavi2023efficientsemanticsegmentationedge}{8}
+\newlabel{LastPage}{{}{9}}
+\xdef\lastpage@lastpage{9}
+\gdef\lastpage@lastpageHy{}
+\gdef \@abspage@last{9}
