@@ -17,9 +17,8 @@ class FoodDataset(Dataset):
         __len__(): Returns the total number of images in the dataset.
         __getitem__(idx): Returns the image and its label at the specified index. Applies augmentation if the count for the label has not been reached.
     """
-    def __init__(self, image_paths_labels: dict[str, str], split : str, transform_counts: dict[int, int], transform: albumentations.Compose | None = None):
+    def __init__(self, image_paths_labels: dict[str, str], transform_counts: dict[int, int], transform: albumentations.Compose | None = None):
         self.image_paths_labels = image_paths_labels
-        self.split = split
         self.transform_counts = transform_counts
         self.transform = transform
         self.augmentation_counts = defaultdict(int)
@@ -31,9 +30,6 @@ class FoodDataset(Dataset):
         # Get the image path and label using the index
         img_path = list(self.image_paths_labels.keys())[idx]
         label = self.image_paths_labels[img_path]
-
-        root = 'data/images/' + ('train_set' if self.split == 'train' else 'train_set' if self.split == 'val' else 'val_set')
-        img_path = os.path.join(root, img_path)
         
         img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
 
