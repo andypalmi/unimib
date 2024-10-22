@@ -25,11 +25,21 @@ train_transforms = A.Compose([
 
 valtest_transforms = A.Compose([
     # Resize to 256x256
-    A.Resize(height=256, width=256),
+    A.Resize(height=256, width=256, always_apply=True),
     
     # Normalize using ImageNet mean and std
     A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     
     # Convert image to a PyTorch tensor
+    ToTensorV2(),
+])
+
+ssl_transforms = A.Compose([
+    A.RandomResizedCrop(height=256, width=256, scale=(0.5, 1.0), p=1.0),
+    A.HorizontalFlip(p=0.5),
+    A.ColorJitter(0.4, 0.4, 0.4, 0.1),
+    A.ToGray(p=0.1),
+    A.GaussianBlur(blur_limit=(3,7), sigma_limit=(0.1, 2.0), p=0.3),
+    A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ToTensorV2(),
 ])
