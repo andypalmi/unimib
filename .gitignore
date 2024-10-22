@@ -20,3 +20,4 @@ Supervised/00_exercises/lab_08/outputs/*.pth
 *.pth
 *.pt
 *.pt.trace.json
+**/logs/**

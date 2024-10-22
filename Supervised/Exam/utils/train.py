@@ -16,12 +16,47 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torch.optim.optimizer import Optimizer
 from torch.nn.modules.module import Module
 
-def get_logs_dir(base_dir='Supervised/Exam/logs'):
+def get_logs_dir(base_dir: str = 'Supervised/Exam/logs') -> str:
+    """
+    Creates and returns a directory path for storing logs with timestamp.
+
+    Args:
+        base_dir (str): Base directory path for storing logs. Defaults to 'Supervised/Exam/logs'.
+
+    Returns:
+        str: Absolute path to the created logs directory.
+    """
     logs_dir = f'{base_dir}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
     os.makedirs(logs_dir, exist_ok=True)
     return os.path.abspath(logs_dir)
 
-def train(trainloader: DataLoader, valloader: DataLoader, run_ssl=True, lr=0.001, device='cuda', epochs=100, patience=10, first_epochs=5, profile_run=False, verbose=True):
+def train(
+    trainloader: DataLoader,
+    valloader: DataLoader,
+    run_ssl: bool = True,
+    lr: float = 0.001,
+    device: str = 'cuda',
+    epochs: int = 100,
+    patience: int = 10,
+    first_epochs: int = 5,
+    profile_run: bool = False,
+    verbose: bool = True
+) -> None:
+    """
+    Trains a neural network model using either supervised or self-supervised learning.
+
+    Args:
+        trainloader (DataLoader): DataLoader for training data.
+        valloader (DataLoader): DataLoader for validation data.
+        run_ssl (bool): If True, runs self-supervised learning. If False, runs supervised learning.
+        lr (float): Initial learning rate. Defaults to 0.001.
+        device (str): Device to run training on ('cuda' or 'cpu'). Defaults to 'cuda'.
+        epochs (int): Maximum number of training epochs. Defaults to 100.
+        patience (int): Number of epochs to wait for improvement before early stopping. Defaults to 10.
+        first_epochs (int): Number of initial epochs before applying early stopping. Defaults to 5.
+        profile_run (bool): If True, enables performance profiling. Defaults to False.
+        verbose (bool): If True, prints training progress. Defaults to True.
+    """
     # Initialize the model
     model = FoodNetResidualsSSL()
     model.to(device)
@@ -93,19 +128,48 @@ def train(trainloader: DataLoader, valloader: DataLoader, run_ssl=True, lr=0.001
         if run_ssl:
             if train_loss < previous_train_loss:
                 previous_train_loss = train_loss
-                save_model(model, train_loss, float('inf'), optimizer, epoch, lr, t_0, is_best=True)
+                save_model(model, train_loss.item(), float('inf'), optimizer, epoch, lr, t_0, logs_dir, is_best=True)
         else:
             # Save the model if it's the best so far
             if val_loss < previous_val_loss:
                 previous_val_loss = val_loss
-                save_model(model, train_loss, val_loss, optimizer, epoch, lr, t_0, is_best=True)
+                save_model(model, train_loss.item(), val_loss, optimizer, epoch, lr, t_0, logs_dir, is_best=True)
 
         # Update previous train loss
         previous_train_loss = train_loss
 
     writer.close()
 
-def run_ssl_training_step(dataloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch):
+def run_ssl_training_step(
+    dataloader: DataLoader,
+    model: Module,
+    optimizer: Optimizer,
+    criterion: Module,
+    pbar: tqdm,
+    pbar_desc: str,
+    device: str,
+    train_loss: torch.Tensor,
+    writer: SummaryWriter,
+    epoch: int
+) -> torch.Tensor:
+    """
+    Executes one epoch of self-supervised learning training.
+
+    Args:
+        dataloader (DataLoader): DataLoader containing training data pairs.
+        model (Module): Neural network model.
+        optimizer (Optimizer): Optimizer for updating model parameters.
+        criterion (Module): Loss function for self-supervised learning.
+        pbar (tqdm): Progress bar object.
+        pbar_desc (str): Description for progress bar.
+        device (str): Device to run training on.
+        train_loss (torch.Tensor): Tensor to accumulate training loss.
+        writer (SummaryWriter): TensorBoard writer object.
+        epoch (int): Current epoch number.
+
+    Returns:
+        torch.Tensor: Average training loss for the epoch.
+    """
     num_batches = len(dataloader)
     log_interval = max(1, num_batches // 10)  # Log 10 times per epoch
 
@@ -139,7 +203,36 @@ def run_ssl_training_step(dataloader, model, optimizer, criterion, pbar, pbar_de
 
     return train_loss / len(dataloader)
 
-def run_training_step(dataloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch):
+def run_training_step(
+    dataloader: DataLoader,
+    model: Module,
+    optimizer: Optimizer,
+    criterion: Module,
+    pbar: tqdm,
+    pbar_desc: str,
+    device: str,
+    train_loss: torch.Tensor,
+    writer: SummaryWriter,
+    epoch: int
+) -> torch.Tensor:
+    """
+    Executes one epoch of supervised learning training.
+
+    Args:
+        dataloader (DataLoader): DataLoader containing training data.
+        model (Module): Neural network model.
+        optimizer (Optimizer): Optimizer for updating model parameters.
+        criterion (Module): Loss function for supervised learning.
+        pbar (tqdm): Progress bar object.
+        pbar_desc (str): Description for progress bar.
+        device (str): Device to run training on.
+        train_loss (torch.Tensor): Tensor to accumulate training loss.
+        writer (SummaryWriter): TensorBoard writer object.
+        epoch (int): Current epoch number.
+
+    Returns:
+        torch.Tensor: Average training loss for the epoch.
+    """
     num_batches = len(dataloader)
     log_interval = max(1, num_batches // 10)  # Log 10 times per epoch
 
@@ -169,7 +262,34 @@ def run_training_step(dataloader, model, optimizer, criterion, pbar, pbar_desc, 
 
     return train_loss / len(dataloader)
 
-def profile_training_step(dataloader, model, optimizer, criterion, pbar, pbar_desc, logs_dir, device, train_loss):
+def profile_training_step(
+    dataloader: DataLoader,
+    model: Module,
+    optimizer: Optimizer,
+    criterion: Module,
+    pbar: tqdm,
+    pbar_desc: str,
+    logs_dir: str,
+    device: str,
+    train_loss: torch.Tensor
+) -> torch.Tensor:
+    """
+    Executes one epoch of training with performance profiling enabled.
+
+    Args:
+        dataloader (DataLoader): DataLoader containing training data.
+        model (Module): Neural network model.
+        optimizer (Optimizer): Optimizer for updating model parameters.
+        criterion (Module): Loss function.
+        pbar (tqdm): Progress bar object.
+        pbar_desc (str): Description for progress bar.
+        logs_dir (str): Directory to save profiling logs.
+        device (str): Device to run training on.
+        train_loss (torch.Tensor): Tensor to accumulate training loss.
+
+    Returns:
+        torch.Tensor: Average training loss for the epoch.
+    """
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
         schedule=schedule(wait=5, warmup=1, active=1),
@@ -203,9 +323,13 @@ def profile_training_step(dataloader, model, optimizer, criterion, pbar, pbar_de
 
         return train_loss / len(dataloader)
 
-def save_profiling_tables(prof, logs_dir):
+def save_profiling_tables(prof: profile, logs_dir: str) -> None:
     """
-    Save CPU and CUDA time tables from the profiler to text files.
+    Saves CPU and CUDA profiling data to text files.
+
+    Args:
+        prof (profile): PyTorch profiler object containing performance data.
+        logs_dir (str): Directory to save the profiling tables.
     """
     cpu_time_table = prof.key_averages().table(sort_by="cpu_time_total", row_limit=20)
     cuda_time_table = prof.key_averages().table(sort_by="cuda_time_total", row_limit=20)
@@ -218,7 +342,27 @@ def save_profiling_tables(prof, logs_dir):
 
     print('Profiling tables saved successfully')
 
-def validate(valloader: DataLoader, model: nn.Module, device='cuda', num_classes=251):
+def validate(
+    valloader: DataLoader,
+    model: nn.Module,
+    device: str = 'cuda',
+    num_classes: int = 251
+) -> tuple[float, torch.Tensor, float]:
+    """
+    Validates the model on a validation dataset.
+
+    Args:
+        valloader (DataLoader): DataLoader containing validation data.
+        model (nn.Module): Neural network model to validate.
+        device (str): Device to run validation on. Defaults to 'cuda'.
+        num_classes (int): Number of classes in the dataset. Defaults to 251.
+
+    Returns:
+        tuple[float, torch.Tensor, float]: Tuple containing:
+            - float: Overall accuracy percentage
+            - torch.Tensor: Per-class accuracy percentages
+            - float: Average validation loss
+    """
     model.eval()  # Set the model to evaluation mode
     correct = 0
     total = 0
@@ -281,13 +425,28 @@ def save_model(
     optimizer: Optimizer,
     epoch: int,
     learning_rate: float,
-    T_0: int,  # CosineAnnealingWarmRestarts T_0 parameter
+    T_0: int,
+    logs_dir: str,
     save_path: str = 'models/',
     is_best: bool = False
 ) -> str:
     """
-    Save the model and optimizer state dictionaries to disk, along with the model architecture.
-    Include the epoch, learning rate, T_0, train loss, and val loss in the filename.
+    Saves model checkpoint with training state and metadata.
+
+    Args:
+        model (Module): Neural network model to save.
+        train_loss (float): Current training loss.
+        val_loss (float): Current validation loss.
+        optimizer (Optimizer): Optimizer state to save.
+        epoch (int): Current epoch number.
+        learning_rate (float): Current learning rate.
+        T_0 (int): Period of learning rate restart in CosineAnnealingWarmRestarts.
+        logs_dir (str): Directory containing training logs.
+        save_path (str): Directory to save model. Defaults to 'models/'.
+        is_best (bool): If True, saves as best model. Defaults to False.
+
+    Returns:
+        str: Path to saved model file.
     """
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -325,6 +484,9 @@ def save_model(
     )
 
     print(f'{"Saving best model" if is_best else "Saving model"} to {model_dir}')
+
+    save_model_stats(model, train_loss, val_loss, epoch, learning_rate, logs_dir, model_dir, T_0, is_best)
+    
     return model_dir
 
 def save_model_stats(
@@ -335,12 +497,22 @@ def save_model_stats(
     learning_rate: float,
     logs_dir: str,
     model_dir: str,
-    T_0: int,  # CosineAnnealingWarmRestarts T_0 parameter
+    T_0: int,
     is_best: bool = False
 ) -> None:
     """
-    Save the model statistics to a CSV file after training.
-    If is_best is True, update the best model stats.
+    Saves model training statistics to CSV files.
+
+    Args:
+        model (Module): Neural network model.
+        train_loss (float): Training loss value.
+        val_loss (float): Validation loss value.
+        epoch (int): Current epoch number.
+        learning_rate (float): Current learning rate.
+        logs_dir (str): Directory containing training logs.
+        model_dir (str): Directory containing saved model.
+        T_0 (int): Period of learning rate restart in CosineAnnealingWarmRestarts.
+        is_best (bool): If True, updates best model statistics. Defaults to False.
     """
     model_name = model.__class__.__name__
 
@@ -371,6 +543,11 @@ def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> N
     Update the stats file with the given stats.
     If overwrite is True, replace the existing row for the same configuration.
     Otherwise, append a new row.
+
+    Args:
+        file_path (str): Path to the CSV file.
+        stats (dict): Dictionary containing model statistics.
+        overwrite (bool): If True, overwrites existing stats for same configuration. Defaults to False.
     """
     # Read existing data
     existing_data = read_csv_with_empty_handling(file_path)
@@ -398,7 +575,16 @@ def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> N
     print(f"{'Overwritten' if overwrite else 'Appended'} row in {file_path}")
 
 
-def read_csv_with_empty_handling(file_path):
+def read_csv_with_empty_handling(file_path: str) -> pd.DataFrame:
+    """
+    Reads a CSV file with proper handling of empty files.
+
+    Args:
+        file_path (str): Path to the CSV file.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the CSV data or empty DataFrame with predefined columns.
+    """
     try:
         df = pd.read_csv(file_path)
         if df.empty:
