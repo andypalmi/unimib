@@ -20,8 +20,8 @@ val_dataset = FoodDataset(val_dict, transform=valtest_transforms)
 test_dataset = FoodDataset(test_dict, transform=valtest_transforms)
 
 # Create a DataLoader for the training set
-ssl_train_loader = DataLoader(ssl_train_dataset, batch_size=160, shuffle=True, num_workers=12, prefetch_factor=5)
-train_loader = DataLoader(train_dataset, batch_size=160, shuffle=True, num_workers=12, prefetch_factor=5)
+ssl_train_loader = DataLoader(ssl_train_dataset, batch_size=48, shuffle=True, num_workers=12, prefetch_factor=5)
+train_loader = DataLoader(train_dataset, batch_size=48, shuffle=True, num_workers=12, prefetch_factor=5)
 val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 

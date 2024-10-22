@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.optim.adamw import AdamW
 from utils.networks.FoodNetResiduals import FoodNetResiduals, FoodNetResidualsSSL
+from utils.networks.FoodNetInvertedResiduals import FoodNetInvertedResidualsSSL
 from torch.utils.data import DataLoader
 from utils.loss.ContrastiveLoss import ContrastiveLoss
 from tqdm import tqdm
@@ -58,7 +59,8 @@ def train(
         verbose (bool): If True, prints training progress. Defaults to True.
     """
     # Initialize the model
-    model = FoodNetResidualsSSL()
+
+    model = FoodNetInvertedResidualsSSL()
     model.to(device)
     if run_ssl:
         summary(model, [(3, 256, 256), (3, 256, 256)], device=str(device))
@@ -66,7 +68,7 @@ def train(
         summary(model, (3, 256, 256), device=str(device))
 
     # Define optimizer, criterion, and scheduler
-    optimizer = AdamW(model.parameters(), lr=lr)
+    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     if run_ssl:
         criterion = ContrastiveLoss()
     else:
