@@ -16,7 +16,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torch.optim.optimizer import Optimizer
 from torch.nn.modules.module import Module
 
-def get_logs_dir(base_dir: str = 'Supervised/Exam/logs') -> str:
+def get_logs_dir(base_dir: str = 'logs') -> str:
     """
     Creates and returns a directory path for storing logs with timestamp.
 
