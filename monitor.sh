@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Query GPU information, replace headers, and align columns
-nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu,fan.speed,power.draw --format=csv,noheader,nounits \
-| awk 'BEGIN{print "VRAM: Used,VRAM: Total,Temp °C,Fan %,Draw W"} {print $0}' \
-| column -t -s ','
+# Default interval value
+interval=0.1
 
-# Print a newline for readability
-echo
-# echo "Ram Usage [GB]"
+# Check if an argument is provided
+if [ $# -gt 0 ]; then
+  interval=$1
+fi
 
-# Query memory information excluding swap, keeping headers, and align columns
-free --giga | awk 'NR==1 || /^Mem:/' | sed 's/Mem://' | column -t
+# Run the watch command with the specified or default interval
+watch -n "$interval" ./monitor_commands.sh
