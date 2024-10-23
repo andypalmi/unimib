@@ -1,0 +1,8 @@
+model_name,epoch,train_loss,val_loss,learning_rate,T_0,logs_dir,model_dir
+FoodNetInvertedResidualsSSL,0,3.3049,inf,0.0448403227016181,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_11-51-17,models/best/FoodNetInvertedResidualsSSL_epoch_0_lr_0.044840_T0_25_train_loss_3.3049_val_loss_inf.pt
+FoodNetInvertedResidualsSSL,1,3.0932,inf,0.0443638090128547,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_11-51-17,models/best/FoodNetInvertedResidualsSSL_epoch_1_lr_0.044364_T0_25_train_loss_3.0932_val_loss_inf.pt
+FoodNetInvertedResidualsSSL,2,3.0371,inf,0.043577973839237,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_11-51-17,models/best/FoodNetInvertedResidualsSSL_epoch_2_lr_0.043578_T0_25_train_loss_3.0371_val_loss_inf.pt
+FoodNetInvertedResidualsSSL,3,3.0051,inf,0.0424952102708882,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_11-51-17,models/best/FoodNetInvertedResidualsSSL_epoch_3_lr_0.042495_T0_25_train_loss_3.0051_val_loss_inf.pt
+FoodNetInvertedResidualsSSL,4,2.9887,inf,0.0411325941360926,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_11-51-17,models/best/FoodNetInvertedResidualsSSL_epoch_4_lr_0.041133_T0_25_train_loss_2.9887_val_loss_inf.pt
+FoodNetInvertedResidualsSSL,5,2.9789,inf,0.0395116147052835,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_11-51-17,models/best/FoodNetInvertedResidualsSSL_epoch_5_lr_0.039512_T0_25_train_loss_2.9789_val_loss_inf.pt
+FoodNetExtraDW,0,3.9023,inf,0.06341379250581461,25,/home/andrea/Documents/unimib/Supervised/Exam/logs/2024-10-23_14-41-18,models/best/FoodNetExtraDW_epoch_0_lr_0.063414_T0_25_train_loss_3.9023_val_loss_inf.pt

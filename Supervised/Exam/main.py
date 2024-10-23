@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+from math import sqrt
 from utils.networks.FoodNet import FoodNet
 from utils.datasets.FoodDataset import FoodDataset
 from utils.datasets.ContrastiveDataset import ContrastiveDataset
@@ -20,10 +21,11 @@ val_dataset = FoodDataset(val_dict, transform=valtest_transforms)
 test_dataset = FoodDataset(test_dict, transform=valtest_transforms)
 
 # Create a DataLoader for the training set
-ssl_train_loader = DataLoader(ssl_train_dataset, batch_size=48, shuffle=True, num_workers=12, prefetch_factor=5)
+scaling_factor = 2
+ssl_train_loader = DataLoader(ssl_train_dataset, batch_size=48 * scaling_factor, shuffle=True, num_workers=12, prefetch_factor=5)
 train_loader = DataLoader(train_dataset, batch_size=48, shuffle=True, num_workers=12, prefetch_factor=5)
 val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
 
 # train(trainloader=train_loader, valloader=val_loader)
-train(trainloader=ssl_train_loader, valloader=val_loader, run_ssl=True, lr=0.001, device='cuda', epochs=100, patience=10, first_epochs=5, profile_run=False, verbose=True)
+train(trainloader=ssl_train_loader, valloader=val_loader, run_ssl=True, lr=0.045 * sqrt(scaling_factor), device='cuda', epochs=100, patience=10, first_epochs=5, profile_run=False, verbose=True)

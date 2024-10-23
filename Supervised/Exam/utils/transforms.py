@@ -35,11 +35,11 @@ valtest_transforms = A.Compose([
 ])
 
 ssl_transforms = A.Compose([
-    A.RandomResizedCrop(height=256, width=256, scale=(0.5, 1.0), p=1.0),
+    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0), p=1.0),
     A.HorizontalFlip(p=0.5),
-    A.ColorJitter(0.4, 0.4, 0.4, 0.1),
-    A.ToGray(p=0.1),
-    A.GaussianBlur(blur_limit=(3,7), sigma_limit=(0.1, 2.0), p=0.3),
+    A.ColorJitter(),
+    # A.ToGray(p=0.1),
+    A.GaussianBlur(blur_limit=(3,7), sigma_limit=0, p=0.3),
     A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ToTensorV2(),
 ])

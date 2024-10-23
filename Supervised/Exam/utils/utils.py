@@ -38,31 +38,39 @@ def load_data(split=0.2, random_state=69420, verbose=True):
         stratify=train_df['label']
     )
 
-    # Get class distribution for each split
-    train_counts = Counter(train_df['label'])
-    val_counts = Counter(val_split_df['label'])
-    test_counts = Counter(val_df['label'])
-
     # Function to duplicate images based on class counts
-    def duplicate_images(df, counts):
+    def duplicate_images(df):
+        """
+        Duplicate images in each class to match the size of the largest class.
+        """
+        class_counts = Counter(df['label'])
+        max_count = max(class_counts.values())
         new_data = []
-        for label in counts.keys():
+        
+        for label in class_counts.keys():
             # Get all images for this class
             class_images = df[df['label'] == label]['image'].tolist()
             if not class_images:  # Skip if no images for this class
                 continue
-            # Calculate how many times to duplicate each image
-            count = counts[label]
-            # Duplicate images randomly
-            for _ in range(count):
+                
+            current_count = len(class_images)
+            
+            # Add all original images
+            new_data.extend([{'image': img, 'label': label} for img in class_images])
+            
+            # Calculate how many additional copies we need
+            needed_copies = max_count - current_count
+            
+            # Duplicate images randomly until we reach max_count
+            for _ in range(needed_copies):
                 img = random.choice(class_images)
                 new_data.append({'image': img, 'label': label})
         return pd.DataFrame(new_data)
 
     # Create balanced datasets by duplicating images
-    train_df_balanced = duplicate_images(train_df, train_counts)
-    val_df_balanced = duplicate_images(val_split_df, val_counts)
-    test_df_balanced = duplicate_images(val_df, test_counts)
+    train_df_balanced = duplicate_images(train_df)
+    val_df_balanced = duplicate_images(val_split_df)
+    test_df_balanced = duplicate_images(val_df)
 
     # Create dictionaries
     train_dict = dict(zip(train_df_balanced['image'], train_df_balanced['label']))
@@ -70,8 +78,7 @@ def load_data(split=0.2, random_state=69420, verbose=True):
     test_dict = dict(zip(test_df_balanced['image'], test_df_balanced['label']))
 
     if verbose:
-        print('Actual training samples:', len(train_dict))
-        print('Actual validation samples:', len(val_dict))
-        print('Actual test samples:', len(test_dict))
+        print(f'Starting Training samples: {len(train_df)} | Validation samples: {len(val_split_df)} | Test samples: {len(val_df)}')
+        print(f'Actual   Training samples: {len(train_df_balanced)} | Validation samples: {len(val_df_balanced)} | Test samples: {len(test_df_balanced)}')
 
     return (train_dict, val_dict, test_dict)

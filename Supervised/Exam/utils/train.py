@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.optim.adamw import AdamW
 from utils.networks.FoodNetResiduals import FoodNetResiduals, FoodNetResidualsSSL
 from utils.networks.FoodNetInvertedResiduals import FoodNetInvertedResidualsSSL
+from utils.networks.FoodNetExtraDW import FoodNetExtraDW
 from torch.utils.data import DataLoader
 from utils.loss.ContrastiveLoss import ContrastiveLoss
 from tqdm import tqdm
@@ -35,7 +36,7 @@ def train(
     trainloader: DataLoader,
     valloader: DataLoader,
     run_ssl: bool = True,
-    lr: float = 0.001,
+    lr: float = 0.005,
     device: str = 'cuda',
     epochs: int = 100,
     patience: int = 10,
@@ -60,7 +61,7 @@ def train(
     """
     # Initialize the model
 
-    model = FoodNetInvertedResidualsSSL()
+    model = FoodNetExtraDW()
     model.to(device)
     if run_ssl:
         summary(model, [(3, 256, 256), (3, 256, 256)], device=str(device))
@@ -89,10 +90,10 @@ def train(
 
         # Initialize progress bar
         if run_ssl:
-            pbar_desc = f'SSL Training | Epoch {epoch+1}/{epochs}'
+            pbar_desc = f'SSL Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
         else:
-            pbar_desc = f'Head Training | Epoch {epoch+1}/{epochs}'
-        pbar = tqdm(trainloader, total=len(trainloader), desc=pbar_desc, ncols=100)
+            pbar_desc = f'Head Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
+        pbar = tqdm(trainloader, total=len(trainloader), desc=pbar_desc, ncols=120)
 
         if run_ssl:
             train_loss = run_ssl_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch)
@@ -120,7 +121,7 @@ def train(
                 patience = 10
 
         if verbose:
-            print(f'Epoch {epoch+1}/{epochs} | Training Loss: {train_loss:.4f} | Previous Loss: {previous_train_loss:.4f} | Patience: {patience}')
+            print(f'Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f} | Training Loss: {train_loss:.4f} | Previous Loss: {previous_train_loss:.4f} | Patience: {patience}')
         
 
         if not run_ssl:
@@ -130,12 +131,12 @@ def train(
         if run_ssl:
             if train_loss < previous_train_loss:
                 previous_train_loss = train_loss
-                save_model(model, train_loss.item(), float('inf'), optimizer, epoch, lr, t_0, logs_dir, is_best=True)
+                save_model(model, train_loss.item(), float('inf'), optimizer, epoch, scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
         else:
             # Save the model if it's the best so far
             if val_loss < previous_val_loss:
                 previous_val_loss = val_loss
-                save_model(model, train_loss.item(), val_loss, optimizer, epoch, lr, t_0, logs_dir, is_best=True)
+                save_model(model, train_loss.item(), val_loss, optimizer, epoch, scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
 
         # Update previous train loss
         previous_train_loss = train_loss
@@ -173,7 +174,7 @@ def run_ssl_training_step(
         torch.Tensor: Average training loss for the epoch.
     """
     num_batches = len(dataloader)
-    log_interval = max(1, num_batches // 10)  # Log 10 times per epoch
+    log_interval = max(1, num_batches // 20)  # Log 10 times per epoch
 
     for i, (img1, img2) in enumerate(pbar):
         img1, img2 = img1.to(device), img2.to(device)
@@ -236,7 +237,7 @@ def run_training_step(
         torch.Tensor: Average training loss for the epoch.
     """
     num_batches = len(dataloader)
-    log_interval = max(1, num_batches // 10)  # Log 10 times per epoch
+    log_interval = max(1, num_batches // 20)  # Log 10 times per epoch
 
     for i, data in enumerate(pbar):
         inputs, labels = data[0].to(device), data[1].to(device)
@@ -374,7 +375,7 @@ def validate(
     criterion = nn.CrossEntropyLoss()
 
     pbar_desc = "Validation Progress"
-    pbar = tqdm(valloader, total=len(valloader), desc=pbar_desc, ncols=100)
+    pbar = tqdm(valloader, total=len(valloader), desc=pbar_desc, ncols=120)
 
     with torch.no_grad():  # Disable gradient calculation for validation
         for data in pbar:
@@ -430,7 +431,8 @@ def save_model(
     T_0: int,
     logs_dir: str,
     save_path: str = 'models/',
-    is_best: bool = False
+    is_best: bool = False,
+    verbose: bool = False
 ) -> str:
     """
     Saves model checkpoint with training state and metadata.
@@ -485,7 +487,8 @@ def save_model(
         model_dir
     )
 
-    print(f'{"Saving best model" if is_best else "Saving model"} to {model_dir}')
+    if verbose:
+        print(f'{"Saving best model" if is_best else "Saving model"} to {model_dir}')
 
     save_model_stats(model, train_loss, val_loss, epoch, learning_rate, logs_dir, model_dir, T_0, is_best)
     
@@ -500,7 +503,8 @@ def save_model_stats(
     logs_dir: str,
     model_dir: str,
     T_0: int,
-    is_best: bool = False
+    is_best: bool = False,
+    verbose=False
 ) -> None:
     """
     Saves model training statistics to CSV files.
@@ -515,6 +519,7 @@ def save_model_stats(
         model_dir (str): Directory containing saved model.
         T_0 (int): Period of learning rate restart in CosineAnnealingWarmRestarts.
         is_best (bool): If True, updates best model statistics. Defaults to False.
+        verbose (bool): If True, prints the updated stats file. Defaults to False.
     """
     model_name = model.__class__.__name__
 
@@ -532,15 +537,17 @@ def save_model_stats(
     # Always update regular model stats
     regular_stats_file = os.path.join('models/stats', 'model_stats.csv')
     update_stats_file(regular_stats_file, stats, overwrite=False)
-    print(f'Updated model stats in {regular_stats_file}')
+    if verbose:
+        print(f'Updated model stats in {regular_stats_file}')
 
     # If it's the best model, update best model stats
     if is_best:
         best_stats_file = os.path.join('models/stats', 'best_model_stats.csv')
         update_stats_file(best_stats_file, stats, overwrite=True)
-        print(f'Updated best model stats in {best_stats_file}')
+        if verbose:
+            print(f'Updated best model stats in {best_stats_file}')
 
-def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> None:
+def update_stats_file(file_path: str, stats: dict, overwrite: bool = False, verbose=False) -> None:
     """
     Update the stats file with the given stats.
     If overwrite is True, replace the existing row for the same configuration.
@@ -550,6 +557,7 @@ def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> N
         file_path (str): Path to the CSV file.
         stats (dict): Dictionary containing model statistics.
         overwrite (bool): If True, overwrites existing stats for same configuration. Defaults to False.
+        verbose (bool): If True, prints the updated file path. Defaults to False.
     """
     # Read existing data
     existing_data = read_csv_with_empty_handling(file_path)
@@ -574,7 +582,8 @@ def update_stats_file(file_path: str, stats: dict, overwrite: bool = False) -> N
 
     # Write the updated data back to the CSV file
     existing_data.to_csv(file_path, index=False)
-    print(f"{'Overwritten' if overwrite else 'Appended'} row in {file_path}")
+    if verbose:
+        print(f"{'Overwritten' if overwrite else 'Appended'} row in {file_path}")
 
 
 def read_csv_with_empty_handling(file_path: str) -> pd.DataFrame:
