@@ -18,6 +18,9 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.tensorboard.writer import SummaryWriter
 from torch.optim.optimizer import Optimizer
 from torch.nn.modules.module import Module
+from typing import Union, Tuple, Dict
+from torch.utils.data import DataLoader
+from nvidia.dali.plugin.pytorch import DALIGenericIterator
 
 def get_logs_dir(base_dir: str = 'logs') -> str:
     """
@@ -34,8 +37,8 @@ def get_logs_dir(base_dir: str = 'logs') -> str:
     return os.path.abspath(logs_dir)
 
 def train(
-    trainloader: DataLoader,
-    valloader: DataLoader,
+    trainloader: Union[DataLoader, DALIGenericIterator],
+    valloader: Union[DataLoader, DALIGenericIterator],
     run_ssl: bool = True,
     lr: float = 0.005,
     device: str = 'cuda',
@@ -66,55 +69,68 @@ def train(
     print(f'Running {"self-supervised" if run_ssl else "supervised"} learning')
     print(f'{'-'*50}')
 
+    is_dali = isinstance(trainloader, DALIGenericIterator)
+
     if run_ssl:
         model = FoodNetExtraDW()
         summary(model, [(3, 256, 256), (3, 256, 256)], device=str(device))
         criterion = ImprovedContrastiveLoss()
     else:
-        # Load pretrained model on SSL
         model = load_pretrained_model('models/best/FoodNetExtraDW_epoch_10_lr_0.003172_T0_25_train_loss_0.0084_val_loss_inf.pt')
         summary(model, (3, 256, 256), device=str(device))
         criterion = nn.CrossEntropyLoss()
     model.to(device)
 
-    # Define optimizer, criterion, and scheduler
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     t_0 = 25
     scheduler = CosineAnnealingWarmRestarts(optimizer, t_0, eta_min=lr / 10)
     
-    # Initialize TensorBoard writer
     logs_dir = get_logs_dir()
     writer = SummaryWriter(logs_dir)
 
-    previous_train_loss = torch.tensor(float('inf')).to(device)
-    previous_val_loss = torch.tensor(float('inf')).to(device)
+    previous_train_loss = float('inf')
+    previous_val_loss = float('inf')
 
     for epoch in range(epochs):
         model.train()
-        train_loss = torch.tensor(0.0).to(device)
+        train_loss = 0.0
 
-        # Initialize progress bar
+        # Reset DALI iterators if using DALI
+        if is_dali:
+            trainloader.reset()
+            if not run_ssl and isinstance(valloader, DALIGenericIterator):
+                valloader.reset()
+
         if run_ssl:
             pbar_desc = f'SSL Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
         else:
             pbar_desc = f'Head Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
-        pbar = tqdm(trainloader, total=len(trainloader), desc=pbar_desc, ncols=150)
+        
+        pbar = tqdm(range(len(trainloader)), desc=pbar_desc, ncols=150)
 
         if run_ssl:
-            train_loss = run_ssl_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch)
+            train_loss = run_ssl_training_step(
+                trainloader, model, optimizer, criterion, 
+                pbar, pbar_desc, device, train_loss, 
+                writer, epoch, is_dali
+            )
         else:
             if profile_run and epoch == 0:
-                train_loss = profile_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, logs_dir, device, train_loss, writer, epoch)
+                train_loss = profile_training_step(
+                    trainloader, model, optimizer, criterion,
+                    pbar, pbar_desc, logs_dir, device,
+                    train_loss, writer, epoch, is_dali
+                )
             else:
-                train_loss = run_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch)
+                train_loss = run_training_step(
+                    trainloader, model, optimizer, criterion,
+                    pbar, pbar_desc, device, train_loss,
+                    writer, epoch, is_dali
+                )
 
-        # Update the learning rate
         scheduler.step()
-
-        # Log the learning rate
         writer.add_scalar('Learning Rate', scheduler.get_last_lr()[0], epoch)
 
-        # Early stopping logic
         if epoch > first_epochs:
             if train_loss > previous_train_loss:
                 patience -= 1
@@ -126,40 +142,41 @@ def train(
                 patience = 10
 
         if verbose:
-            print(f'Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f} | Training Loss: {train_loss:.4f} | Previous Loss: {previous_train_loss:.4f} | Patience: {patience}')
-        
+            print(f'Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f} | '
+                  f'Training Loss: {train_loss:.4f} | Previous Loss: {previous_train_loss:.4f} | '
+                  f'Patience: {patience}')
 
         if not run_ssl:
-            # Validate the model
-            accuracy, class_accuracy, val_loss = validate(valloader, model, device=device)
+            accuracy, class_accuracy, val_loss = validate(valloader, model, device, is_dali)
 
         if run_ssl:
             if train_loss < previous_train_loss:
                 previous_train_loss = train_loss
-                save_model(model, train_loss.item(), float('inf'), optimizer, epoch, scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
+                save_model(model, train_loss, float('inf'), optimizer, epoch,
+                          scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
         else:
-            # Save the model if it's the best so far
             if val_loss < previous_val_loss:
                 previous_val_loss = val_loss
-                save_model(model, train_loss.item(), val_loss, optimizer, epoch, scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
+                save_model(model, train_loss, val_loss, optimizer, epoch,
+                          scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
 
-        # Update previous train loss
         previous_train_loss = train_loss
 
     writer.close()
 
 def run_ssl_training_step(
-    dataloader: DataLoader,
+    dataloader: Union[DataLoader, DALIGenericIterator],
     model: Module,
     optimizer: Optimizer,
     criterion: Module,
     pbar: tqdm,
     pbar_desc: str,
     device: str,
-    train_loss: torch.Tensor,
+    train_loss: float,
     writer: SummaryWriter,
-    epoch: int
-) -> torch.Tensor:
+    epoch: int,
+    is_dali: bool
+) -> float:
     """
     Executes one epoch of self-supervised learning training.
 
@@ -174,55 +191,50 @@ def run_ssl_training_step(
         train_loss (torch.Tensor): Tensor to accumulate training loss.
         writer (SummaryWriter): TensorBoard writer object.
         epoch (int): Current epoch number.
-
+        is_dali (bool): If True, indicates DALI pipeline is used.
     Returns:
-        torch.Tensor: Average training loss for the epoch.
+        float: Average training loss for the epoch.
     """
     num_batches = len(dataloader)
-    log_interval = max(1, num_batches // 20)  # Log 20 times per epoch
+    log_interval = max(1, num_batches // 20)
 
-    for i, (img1, img2) in enumerate(pbar):
-        img1, img2 = img1.to(device), img2.to(device)
+    for i, data in enumerate(dataloader):
+        # Handle different data formats
+        if is_dali:
+            img1, img2 = data[0]['images'], data[1]['images']
+        else:
+            img1, img2 = data[0].to(device), data[1].to(device) # type: ignore
+
         optimizer.zero_grad()
-
-        # Forward pass
         z1, z2 = model(img1, img2)
-
-        # Compute contrastive loss
         loss = criterion(z1, z2)
-
-        # Backpropagation and optimization
         loss.backward()
         optimizer.step()
 
-        # Update loss
         train_loss += loss.item()
 
-        # Log the training loss at intervals
         if (i + 1) % log_interval == 0 or (i + 1) == num_batches:
             writer.add_scalar('SSL Training Loss', train_loss / (i + 1), epoch * num_batches + i + 1)
 
-        # Update progress
         pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f}')
         pbar.update(1)
 
-    # Clear CUDA cache
     torch.cuda.empty_cache()
-
-    return train_loss / len(dataloader)
+    return train_loss / num_batches
 
 def run_training_step(
-    dataloader: DataLoader,
+    dataloader: Union[DataLoader, DALIGenericIterator],
     model: Module,
     optimizer: Optimizer,
     criterion: Module,
     pbar: tqdm,
     pbar_desc: str,
     device: str,
-    train_loss: torch.Tensor,
+    train_loss: float,
     writer: SummaryWriter,
     epoch: int,
-) -> torch.Tensor:
+    is_dali: bool
+) -> float:
     """
     Executes one epoch of supervised learning training.
 
@@ -242,44 +254,43 @@ def run_training_step(
         torch.Tensor: Average training loss for the epoch.
     """
     num_batches = len(dataloader)
-    log_interval = max(1, num_batches // 20)  # Log 20 times per epoch
-
+    log_interval = max(1, num_batches // 20)
+    
     correct = 0
     total = 0
 
-    for i, data in enumerate(pbar):
-        inputs, labels = data[0].to(device), data[1].to(device)
-        optimizer.zero_grad()
+    for i, data in enumerate(dataloader):
+        # Handle different data formats
+        if is_dali:
+            inputs = data[0]['images']
+            labels = data[0]['labels']
+        else:
+            inputs, labels = data[0].to(device), data[1].to(device) # type: ignore
 
-        # Forward and backward pass
+        optimizer.zero_grad()
         outputs = model(inputs, mode='train_supervised')
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
-        # Update loss
         train_loss += loss.item()
         _, predicted = outputs.max(1)
         total += labels.size(0)
         correct += predicted.eq(labels).sum().item()
 
-        # Log the training loss at intervals
         if (i + 1) % log_interval == 0 or (i + 1) == num_batches:
             writer.add_scalar('Training Loss', train_loss / (i + 1), epoch * num_batches + i + 1)
             writer.add_scalar('Training Accuracy', 100 * correct / total, epoch * num_batches + i + 1)
 
-        # Update progress
         accuracy = 100 * correct / total
         pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f} | Accuracy: {accuracy:.2f}%')
         pbar.update(1)
-    
-    # Clear CUDA cache
-    torch.cuda.empty_cache()
 
-    return train_loss / len(dataloader)
+    torch.cuda.empty_cache()
+    return train_loss / num_batches
 
 def profile_training_step(
-    dataloader: DataLoader,
+    dataloader: Union[DataLoader, DALIGenericIterator],
     model: Module,
     optimizer: Optimizer,
     criterion: Module,
@@ -287,10 +298,11 @@ def profile_training_step(
     pbar_desc: str,
     logs_dir: str,
     device: str,
-    train_loss: torch.Tensor,
+    train_loss: float,
     writer: SummaryWriter,
     epoch: int,
-) -> torch.Tensor:
+    is_dali: bool
+) -> float:
     """
     Executes one epoch of training with performance profiling enabled.
 
@@ -310,52 +322,50 @@ def profile_training_step(
     """
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        schedule=schedule(wait=5, warmup=1, active=1),
+        schedule=schedule(wait=5, warmup=10, active=20),
         on_trace_ready=tensorboard_trace_handler(logs_dir),
         record_shapes=True, profile_memory=True, with_stack=True
     ) as prof:
         num_batches = len(dataloader)
-        log_interval = max(1, num_batches // 20)  # Log 20 times per epoch
-
+        log_interval = max(1, num_batches // 20)
+        
         correct = 0
         total = 0
 
-        for i, data in enumerate(pbar):
-            inputs, labels = data[0].to(device), data[1].to(device)
-            optimizer.zero_grad()
+        for i, data in enumerate(dataloader):
+            # Handle different data formats
+            if is_dali:
+                inputs = data[0]['images']
+                labels = data[0]['labels']
+            else:
+                inputs, labels = data[0].to(device), data[1].to(device) # type: ignore
 
-            # Forward and backward pass
+            optimizer.zero_grad()
             outputs = model(inputs, mode='train_supervised')
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            # Update loss
             train_loss += loss.item()
             _, predicted = outputs.max(1)
             total += labels.size(0)
             correct += predicted.eq(labels).sum().item()
 
-            # Log the training loss at intervals
             if (i + 1) % log_interval == 0 or (i + 1) == num_batches:
                 writer.add_scalar('Training Loss', train_loss / (i + 1), epoch * num_batches + i + 1)
                 writer.add_scalar('Training Accuracy', 100 * correct / total, epoch * num_batches + i + 1)
 
-            # Update progress
             accuracy = 100 * correct / total
             pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f} | Accuracy: {accuracy:.2f}%')
             pbar.update(1)
 
             prof.step()
 
-            # Save profiling after 25 iterations
-            if i == 25:
+            if i == 50:
                 save_profiling_tables(prof, logs_dir)
 
-        # Clear CUDA cache
         torch.cuda.empty_cache()
-
-        return train_loss / len(dataloader)
+        return train_loss / num_batches
 
 def save_profiling_tables(prof: profile, logs_dir: str) -> None:
     """
@@ -377,18 +387,20 @@ def save_profiling_tables(prof: profile, logs_dir: str) -> None:
     print('Profiling tables saved successfully')
 
 def validate(
-    valloader: DataLoader,
-    model: nn.Module,
+    valloader: Union[DataLoader, DALIGenericIterator],
+    model: Module,
     device: str = 'cuda',
+    is_dali: bool = False,
     num_classes: int = 251
 ) -> tuple[float, torch.Tensor, float]:
     """
-    Validates the model on a validation dataset.
+    Validates the model on a validation dataset with integer labels from 0 to 250.
 
     Args:
         valloader (DataLoader): DataLoader containing validation data.
-        model (nn.Module): Neural network model to validate.
+        model (Module): Neural network model to validate.
         device (str): Device to run validation on. Defaults to 'cuda'.
+        is_dali (bool): Whether using DALI data loader. Defaults to False.
         num_classes (int): Number of classes in the dataset. Defaults to 251.
 
     Returns:
@@ -397,45 +409,44 @@ def validate(
             - torch.Tensor: Per-class accuracy percentages
             - float: Average validation loss
     """
-    model.eval()  # Set the model to evaluation mode
+    model.eval()
     correct = 0
     total = 0
-    class_correct = torch.zeros(num_classes, dtype=torch.int32)
-    class_total = torch.zeros(num_classes, dtype=torch.int32)
+    class_correct = torch.zeros(num_classes, device=device)
+    class_total = torch.zeros(num_classes, device=device)
     val_loss = 0.0
     criterion = nn.CrossEntropyLoss()
 
     pbar_desc = "Validation Progress"
     pbar = tqdm(valloader, total=len(valloader), desc=pbar_desc, ncols=120)
 
-    with torch.no_grad():  # Disable gradient calculation for validation
-        for data in pbar:
-            inputs, labels = data[0].to(device), data[1].to(device)
+    with torch.no_grad():
+        for i, data in enumerate(valloader):
+            # Handle different data formats
+            if is_dali:
+                images = data[0]['images']
+                labels = data[0]['labels']
+            else:
+                images, labels = data[0].to(device), data[1].to(device) # type: ignore
 
-            # Forward pass
-            outputs = model(inputs)
+            outputs = model(images, mode='train_supervised')
             loss = criterion(outputs, labels)
             val_loss += loss.item()
 
             _, predicted = torch.max(outputs, 1)
-
-            # Update total and correct predictions
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-            # Update class-wise correct and total counts
-            for i in range(len(labels)):
-                label = labels[i].item()
-                class_correct[label] += (predicted[i] == labels[i]).item()
-                class_total[label] += 1
+            # Update class-wise statistics
+            for label in range(num_classes):
+                mask = (labels == label)
+                class_total[label] += mask.sum().item()
+                class_correct[label] += ((predicted == labels) & mask).sum().item()
 
-            # Update progress bar
             accuracy = 100 * correct / total
             pbar.set_description(f'{pbar_desc} | Loss {val_loss / (i + 1):.4f} | Accuracy: {accuracy:.2f}%')
 
-    # Compute overall accuracy
-    accuracy = 100 * correct / total
-    print(f'Overall Accuracy: {accuracy:.2f}%')
+    pbar.close()
 
     # Compute class-wise accuracy
     class_accuracy = 100 * class_correct / class_total
@@ -443,7 +454,7 @@ def validate(
     # Print classes falling into different accuracy bins
     bins = [(0, 20), (20, 40), (40, 60), (60, 80), (80, 100)]
     for low, high in bins:
-        classes_in_bin = [i for i, acc in enumerate(class_accuracy) if low <= acc < high]
+        classes_in_bin = torch.where((class_accuracy >= low) & (class_accuracy < high))[0].tolist()
         print(f'Classes with accuracy between {low}% and {high}%: {classes_in_bin}')
 
     # Compute average validation loss

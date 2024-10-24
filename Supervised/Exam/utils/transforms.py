@@ -1,5 +1,21 @@
 import albumentations as A
+import torch
 from albumentations.pytorch import ToTensorV2
+
+import kornia.augmentation as K
+
+train_transforms_kornia = torch.nn.Sequential(
+    K.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0), ratio=(0.99, 1.0), p=1.0),
+    K.RandomHorizontalFlip(),
+    K.ColorJitter(hue=0.1),
+    K.RandomGaussianBlur((3, 7), (0.1, 0.5)),
+    K.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]), std=torch.tensor([0.229, 0.224, 0.225]))
+)
+
+valtest_transforms_kornia = torch.nn.Sequential(
+    K.RandomResizedCrop(size=(256, 256), scale=(0.99, 1.0), ratio=(0.99, 1.0), p=1.0),
+    K.Normalize(mean=torch.tensor([0.485, 0.456, 0.406]), std=torch.tensor([0.229, 0.224, 0.225]))
+)
 
 # Define the transformation pipeline
 train_transforms = A.Compose([
