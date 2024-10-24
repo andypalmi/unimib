@@ -42,3 +42,40 @@ class ContrastiveLoss(nn.Module):
         # Calculate contrastive loss
         loss = F.cross_entropy(similarity_matrix, labels)
         return loss
+
+class ImprovedContrastiveLoss(nn.Module):
+    def __init__(self, temperature=0.07, batch_size=None):
+        super().__init__()
+        self.temperature = temperature
+        self.batch_size = batch_size
+        
+    def forward(self, z1, z2):
+        """
+        Improved contrastive loss with better numerical stability and efficiency
+        Args:
+            z1, z2: Tensor of shape [batch_size, feature_dim]
+        """
+        batch_size = z1.shape[0] if self.batch_size is None else self.batch_size
+        
+        # Normalize embeddings
+        z1 = F.normalize(z1, dim=1)
+        z2 = F.normalize(z2, dim=1)
+        
+        # Gather representations from all GPUs if using distributed training
+        embeddings = torch.cat([z1, z2], dim=0)
+        
+        # Compute similarity matrix
+        similarity = torch.matmul(embeddings, embeddings.T) / self.temperature
+        
+        # Remove diagonal entries (self-similarity) for numerical stability
+        mask = ~torch.eye(2 * batch_size, dtype=torch.bool, device=similarity.device)
+        similarity = similarity.masked_fill(~mask, -torch.inf)
+        
+        # Create positive pair labels
+        labels = torch.arange(batch_size, device=similarity.device)
+        labels = torch.cat([labels + batch_size, labels])
+        
+        # Compute loss
+        loss = F.cross_entropy(similarity, labels)
+        
+        return loss

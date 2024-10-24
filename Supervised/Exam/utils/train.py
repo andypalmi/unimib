@@ -3,11 +3,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.optim.adamw import AdamW
+from utils.utils import load_pretrained_model
 from utils.networks.FoodNetResiduals import FoodNetResiduals, FoodNetResidualsSSL
 from utils.networks.FoodNetInvertedResiduals import FoodNetInvertedResidualsSSL
 from utils.networks.FoodNetExtraDW import FoodNetExtraDW
 from torch.utils.data import DataLoader
-from utils.loss.ContrastiveLoss import ContrastiveLoss
+from utils.loss.ContrastiveLoss import ContrastiveLoss, ImprovedContrastiveLoss
 from tqdm import tqdm
 from torchsummary import summary
 from torch.profiler import ProfilerActivity, profile, schedule, tensorboard_trace_handler
@@ -61,19 +62,23 @@ def train(
     """
     # Initialize the model
 
-    model = FoodNetExtraDW()
-    model.to(device)
+    print(f'{'-'*50}')
+    print(f'Running {"self-supervised" if run_ssl else "supervised"} learning')
+    print(f'{'-'*50}')
+
     if run_ssl:
+        model = FoodNetExtraDW()
         summary(model, [(3, 256, 256), (3, 256, 256)], device=str(device))
+        criterion = ImprovedContrastiveLoss()
     else:
+        # Load pretrained model on SSL
+        model = load_pretrained_model('models/best/FoodNetExtraDW_epoch_10_lr_0.003172_T0_25_train_loss_0.0084_val_loss_inf.pt')
         summary(model, (3, 256, 256), device=str(device))
+        criterion = nn.CrossEntropyLoss()
+    model.to(device)
 
     # Define optimizer, criterion, and scheduler
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    if run_ssl:
-        criterion = ContrastiveLoss()
-    else:
-        criterion = nn.CrossEntropyLoss()
     t_0 = 25
     scheduler = CosineAnnealingWarmRestarts(optimizer, t_0, eta_min=lr / 10)
     
@@ -93,13 +98,13 @@ def train(
             pbar_desc = f'SSL Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
         else:
             pbar_desc = f'Head Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
-        pbar = tqdm(trainloader, total=len(trainloader), desc=pbar_desc, ncols=120)
+        pbar = tqdm(trainloader, total=len(trainloader), desc=pbar_desc, ncols=150)
 
         if run_ssl:
             train_loss = run_ssl_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch)
         else:
             if profile_run and epoch == 0:
-                train_loss = profile_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, logs_dir, device, train_loss)
+                train_loss = profile_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, logs_dir, device, train_loss, writer, epoch)
             else:
                 train_loss = run_training_step(trainloader, model, optimizer, criterion, pbar, pbar_desc, device, train_loss, writer, epoch)
 
@@ -174,7 +179,7 @@ def run_ssl_training_step(
         torch.Tensor: Average training loss for the epoch.
     """
     num_batches = len(dataloader)
-    log_interval = max(1, num_batches // 20)  # Log 10 times per epoch
+    log_interval = max(1, num_batches // 20)  # Log 20 times per epoch
 
     for i, (img1, img2) in enumerate(pbar):
         img1, img2 = img1.to(device), img2.to(device)
@@ -216,7 +221,7 @@ def run_training_step(
     device: str,
     train_loss: torch.Tensor,
     writer: SummaryWriter,
-    epoch: int
+    epoch: int,
 ) -> torch.Tensor:
     """
     Executes one epoch of supervised learning training.
@@ -237,27 +242,35 @@ def run_training_step(
         torch.Tensor: Average training loss for the epoch.
     """
     num_batches = len(dataloader)
-    log_interval = max(1, num_batches // 20)  # Log 10 times per epoch
+    log_interval = max(1, num_batches // 20)  # Log 20 times per epoch
+
+    correct = 0
+    total = 0
 
     for i, data in enumerate(pbar):
         inputs, labels = data[0].to(device), data[1].to(device)
         optimizer.zero_grad()
 
         # Forward and backward pass
-        outputs = model(inputs)
+        outputs = model(inputs, mode='train_supervised')
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
         # Update loss
         train_loss += loss.item()
+        _, predicted = outputs.max(1)
+        total += labels.size(0)
+        correct += predicted.eq(labels).sum().item()
 
         # Log the training loss at intervals
         if (i + 1) % log_interval == 0 or (i + 1) == num_batches:
             writer.add_scalar('Training Loss', train_loss / (i + 1), epoch * num_batches + i + 1)
+            writer.add_scalar('Training Accuracy', 100 * correct / total, epoch * num_batches + i + 1)
 
         # Update progress
-        pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f}')
+        accuracy = 100 * correct / total
+        pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f} | Accuracy: {accuracy:.2f}%')
         pbar.update(1)
     
     # Clear CUDA cache
@@ -274,7 +287,9 @@ def profile_training_step(
     pbar_desc: str,
     logs_dir: str,
     device: str,
-    train_loss: torch.Tensor
+    train_loss: torch.Tensor,
+    writer: SummaryWriter,
+    epoch: int,
 ) -> torch.Tensor:
     """
     Executes one epoch of training with performance profiling enabled.
@@ -299,22 +314,38 @@ def profile_training_step(
         on_trace_ready=tensorboard_trace_handler(logs_dir),
         record_shapes=True, profile_memory=True, with_stack=True
     ) as prof:
+        num_batches = len(dataloader)
+        log_interval = max(1, num_batches // 20)  # Log 20 times per epoch
+
+        correct = 0
+        total = 0
+
         for i, data in enumerate(pbar):
             inputs, labels = data[0].to(device), data[1].to(device)
             optimizer.zero_grad()
 
             # Forward and backward pass
-            outputs = model(inputs)
+            outputs = model(inputs, mode='train_supervised')
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
             # Update loss
             train_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
 
-            # Update progress and profile step
-            pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f}')
+            # Log the training loss at intervals
+            if (i + 1) % log_interval == 0 or (i + 1) == num_batches:
+                writer.add_scalar('Training Loss', train_loss / (i + 1), epoch * num_batches + i + 1)
+                writer.add_scalar('Training Accuracy', 100 * correct / total, epoch * num_batches + i + 1)
+
+            # Update progress
+            accuracy = 100 * correct / total
+            pbar.set_description(f'{pbar_desc} | Loss: {train_loss / (i + 1):.4f} | Accuracy: {accuracy:.2f}%')
             pbar.update(1)
+
             prof.step()
 
             # Save profiling after 25 iterations
@@ -400,7 +431,7 @@ def validate(
 
             # Update progress bar
             accuracy = 100 * correct / total
-            pbar.set_description(f'{pbar_desc} | Accuracy: {accuracy:.2f}%')
+            pbar.set_description(f'{pbar_desc} | Loss {val_loss / (i + 1):.4f} | Accuracy: {accuracy:.2f}%')
 
     # Compute overall accuracy
     accuracy = 100 * correct / total
@@ -493,6 +524,21 @@ def save_model(
     save_model_stats(model, train_loss, val_loss, epoch, learning_rate, logs_dir, model_dir, T_0, is_best)
     
     return model_dir
+
+def load_model(model_path: str): 
+    """
+    Load a saved model from a file.
+
+    Args:
+        model_path (str): Path to the saved model file.
+
+    Returns:
+        Module: Loaded model.
+    """
+    checkpoint = torch.load(model_path)
+    model = checkpoint['model_architecture']
+    model.load_state_dict(checkpoint['model_state_dict'])
+    return model
 
 def save_model_stats(
     model: Module,

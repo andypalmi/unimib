@@ -3,6 +3,48 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from collections import Counter
 import random
+import torch
+from torch import nn
+
+def load_pretrained_model(model_path: str, device: str = 'cuda' if torch.cuda.is_available() else 'cpu') -> nn.Module:
+    """
+    Loads a pretrained model and prepares it for classification fine-tuning.
+    
+    Args:
+        model_path (str): Path to the saved model checkpoint
+        device (str): Device to load the model on
+    
+    Returns:
+        nn.Module: Modified model ready for classification
+    """
+    # Load the checkpoint
+    checkpoint = torch.load(model_path, map_location=device)
+    
+    # Create a new model instance
+    model = checkpoint['model_architecture']
+
+    # Load the state dict
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    # Move model to device
+    model = model.to(device)
+    
+    # Freeze all parameters
+    for param in model.parameters():
+        param.requires_grad = False
+    
+    # Only keep the first projection head for feature extraction
+    # and create a new classifier
+    model.projection2 = None
+
+    # Modify classifier head
+    model.classifier = nn.Linear(in_features=128, out_features=251)
+
+    # Unfreeze the classifier parameters
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+    return model
 
 def load_data(split=0.2, random_state=69420, verbose=True):
     """

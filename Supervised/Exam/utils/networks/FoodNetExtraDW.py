@@ -100,8 +100,8 @@ class FoodNetExtraDW(nn.Module):
         x = self.pool(x)
         return x.flatten(1)
     
-    def forward(self, x1, x2=None, mode='train'):
-        if mode == 'train':
+    def forward(self, x1, x2=None, mode='train_supervised'):
+        if mode == 'train_ssl':
             # Self-supervised training mode
             f1 = self.forward_features(x1)
             f2 = self.forward_features(x2)
@@ -111,10 +111,12 @@ class FoodNetExtraDW(nn.Module):
             
             return z1, z2
         
-        elif mode == 'eval':
+        elif mode == 'train_supervised' or mode == 'eval':
             # Evaluation mode (classification)
             f = self.forward_features(x1)
-            return self.classifier(f)
+            z = self.projection1(f)
+
+            return self.classifier(z)
         
         else:
             # Feature extraction mode
