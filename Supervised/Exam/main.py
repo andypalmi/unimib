@@ -35,29 +35,29 @@ def main():
         'pin_memory': True
     }
     
-    ssl_train_loader = DataLoader(
-        ssl_train_dataset,
-        shuffle=True,
-        **common_dataloader_args
-    )
+    # ssl_train_loader = DataLoader(
+    #     ssl_train_dataset,
+    #     shuffle=True,
+    #     **common_dataloader_args
+    # )
     
-    train_loader = DataLoader(
-        train_dataset,
-        shuffle=True,
-        **common_dataloader_args
-    )
+    # train_loader = DataLoader(
+    #     train_dataset,
+    #     shuffle=True,
+    #     **common_dataloader_args
+    # )
     
-    val_loader = DataLoader(
-        val_dataset,
-        shuffle=False,
-        **common_dataloader_args
-    )
+    # val_loader = DataLoader(
+    #     val_dataset,
+    #     shuffle=False,
+    #     **common_dataloader_args
+    # )
     
-    test_loader = DataLoader(
-        test_dataset,
-        shuffle=False,
-        **common_dataloader_args
-    )
+    # test_loader = DataLoader(
+    #     test_dataset,
+    #     shuffle=False,
+    #     **common_dataloader_args
+    # )
 
     # Create DALI dataloaders
     # Note: DALI handles data augmentation internally through the pipeline
@@ -65,7 +65,7 @@ def main():
         train_image_paths_labels=train_dict,
         val_image_paths_labels=val_dict,
         test_image_paths_labels=test_dict,
-        batch_size=96,
+        batch_size=256,
         num_threads=8,  # Equivalent to num_workers in PyTorch
         device_id=0  # Assuming using first GPU
     )
@@ -80,7 +80,7 @@ def main():
         epochs=100,
         patience=10,
         first_epochs=5,
-        profile_run=True,
+        profile_run=False,
         verbose=True
     )
 

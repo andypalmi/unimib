@@ -95,12 +95,6 @@ def train(
         model.train()
         train_loss = 0.0
 
-        # Reset DALI iterators if using DALI
-        if is_dali:
-            trainloader.reset()
-            if not run_ssl and isinstance(valloader, DALIGenericIterator):
-                valloader.reset()
-
         if run_ssl:
             pbar_desc = f'SSL Training | Epoch {epoch+1}/{epochs} | LR: {scheduler.get_last_lr()[0]:.6f}'
         else:
@@ -161,6 +155,12 @@ def train(
                           scheduler.get_last_lr()[0], t_0, logs_dir, is_best=True)
 
         previous_train_loss = train_loss
+
+        # Reset DALI iterator if using DALI AFTER epoch
+        if is_dali:
+            trainloader.reset()
+            if isinstance(valloader, DALIGenericIterator):
+                valloader.reset()
 
     writer.close()
 
@@ -263,7 +263,7 @@ def run_training_step(
         # Handle different data formats
         if is_dali:
             inputs = data[0]['images']
-            labels = data[0]['labels']
+            labels = data[0]['labels'].squeeze()
         else:
             inputs, labels = data[0].to(device), data[1].to(device) # type: ignore
 
@@ -336,7 +336,7 @@ def profile_training_step(
             # Handle different data formats
             if is_dali:
                 inputs = data[0]['images']
-                labels = data[0]['labels']
+                labels = data[0]['labels'].squeeze()
             else:
                 inputs, labels = data[0].to(device), data[1].to(device) # type: ignore
 
@@ -425,7 +425,7 @@ def validate(
             # Handle different data formats
             if is_dali:
                 images = data[0]['images']
-                labels = data[0]['labels']
+                labels = data[0]['labels'].squeeze()
             else:
                 images, labels = data[0].to(device), data[1].to(device) # type: ignore
 
