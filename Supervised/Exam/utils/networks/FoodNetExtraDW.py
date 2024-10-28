@@ -1,84 +1,60 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-class ExtraDWBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, expansion_factor=4):
-        super().__init__()
-        expanded_channels = in_channels * expansion_factor
-        
-        self.skip_connection = stride == 1 and in_channels == out_channels
-        
-        self.conv = nn.Sequential(
-            # Initial DW Conv
-            nn.Conv2d(in_channels, in_channels, 3, stride, 1, groups=in_channels, bias=False),
-            nn.BatchNorm2d(in_channels),
-            nn.SiLU(inplace=True),
-            
-            # Expansion
-            nn.Conv2d(in_channels, expanded_channels, 1, bias=False),
-            nn.BatchNorm2d(expanded_channels),
-            nn.SiLU(inplace=True),
-            
-            # Second DW Conv
-            nn.Conv2d(expanded_channels, expanded_channels, 3, 1, 1, groups=expanded_channels, bias=False),
-            nn.BatchNorm2d(expanded_channels),
-            nn.SiLU(inplace=True),
-            
-            # Projection
-            nn.Conv2d(expanded_channels, out_channels, 1, bias=False),
-            nn.BatchNorm2d(out_channels)
-        )
-        
-    def forward(self, x):
-        if self.skip_connection:
-            return x + self.conv(x)
-        return self.conv(x)
+from utils.networks.ExtraDWBlock import ExtraDWBlock
 
 class FoodNetExtraDW(nn.Module):
-    def __init__(self, num_classes=251, embedding_dim=128):
+    def __init__(self, num_classes=251, embedding_dim=512):
         super().__init__()
         
-        # Stem layer
-        self.stem = nn.Sequential(
-            nn.Conv2d(3, 16, 3, 2, 1, bias=False),
-            nn.BatchNorm2d(16),
-            nn.SiLU(inplace=True)
-        )
-        
         # Main stages
-        self.stage1 = self._make_stage(16, 24, 2, 2)    # 128 -> 64
-        self.stage2 = self._make_stage(24, 32, 2, 2)    # 64 -> 32
-        self.stage3 = self._make_stage(32, 64, 3, 2)    # 32 -> 16
-        self.stage4 = self._make_stage(64, 96, 2, 2)    # 16 -> 8
+        self.stage1 = self._make_stage(3, 16, 2, 2, 7)   # 256 -> 126
+        self.pool1 = nn.MaxPool2d(2, 2)                 # 126 -> 122
+        self.stage2 = self._make_stage(16, 32, 2, 2)    # 122 -> 61
+        self.stage3 = self._make_stage(32, 64, 2, 2)    # 61 -> 31
+        self.stage4 = self._make_stage(64, 128, 3, 2)    # 31 -> 16
+        # self.stage4 = self._make_stage(64, 96, 3, 2)    # 32 -> 16
         
         # Global pooling and projection head
         self.pool = nn.AdaptiveAvgPool2d(1)
         
         # Two separate projection heads for contrastive learning
         self.projection1 = nn.Sequential(
-            nn.Linear(96, 256),
+            nn.Linear(128, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(inplace=True),
             nn.Linear(256, embedding_dim)
         )
         
         self.projection2 = nn.Sequential(
-            nn.Linear(96, 256),
+            nn.Linear(128, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(inplace=True),
             nn.Linear(256, embedding_dim)
         )
         
-        # Optional classification head (can be used after pre-training)
-        self.classifier = nn.Linear(96, num_classes)
+        # Classification head to use during supervised training
+        self.classifier = nn.Linear(embedding_dim, num_classes)
         
         # Initialize weights
         self._initialize_weights()
     
-    def _make_stage(self, in_channels, out_channels, num_blocks, stride):
+    def _make_stage(self, in_channels: int, out_channels: int, num_blocks: int, stride: int, kernel_size=3):
+        """
+        Creates a stage consisting of a sequence of ExtraDWBlock layers.
+
+        Args:
+            in_channels (int): Number of input channels for the first block.
+            out_channels (int): Number of output channels for each block.
+            num_blocks (int): Number of blocks in the stage.
+            stride (int): Stride for the first block.
+            kernel_size (int, optional): Kernel size for the first block. Default is 3.
+
+        Returns:
+            nn.Sequential: A sequential container of ExtraDWBlock layers.
+        """
         layers = []
-        layers.append(ExtraDWBlock(in_channels, out_channels, stride))
+        layers.append(ExtraDWBlock(in_channels, out_channels, kernel_size, stride))
         for _ in range(1, num_blocks):
             layers.append(ExtraDWBlock(out_channels, out_channels))
         return nn.Sequential(*layers)
@@ -92,8 +68,8 @@ class FoodNetExtraDW(nn.Module):
                 nn.init.constant_(m.bias, 0)
     
     def forward_features(self, x):
-        x = self.stem(x)
         x = self.stage1(x)
+        x = self.pool1(x)
         x = self.stage2(x)
         x = self.stage3(x)
         x = self.stage4(x)

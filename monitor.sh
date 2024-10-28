@@ -9,4 +9,4 @@ if [ $# -gt 0 ]; then
 fi
 
 # Run the watch command with the specified or default interval
-watch -n "$interval" ./monitor_commands.sh
+watch -n "$interval" ./commands_to_monitor.sh

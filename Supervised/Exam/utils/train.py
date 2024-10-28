@@ -7,10 +7,12 @@ from utils.utils import load_pretrained_model
 from utils.networks.FoodNetResiduals import FoodNetResiduals, FoodNetResidualsSSL
 from utils.networks.FoodNetInvertedResiduals import FoodNetInvertedResidualsSSL
 from utils.networks.FoodNetExtraDW import FoodNetExtraDW
+from utils.networks.FoodNetUnetExtraDW import FoodNetUnetExtraDW
 from torch.utils.data import DataLoader
-from utils.loss.ContrastiveLoss import ContrastiveLoss, ImprovedContrastiveLoss
+from utils.loss.ContrastiveLoss import ContrastiveLoss
 from tqdm import tqdm
-from torchsummary import summary
+# from torchsummary import summary
+from utils.utils import summary
 from torch.profiler import ProfilerActivity, profile, schedule, tensorboard_trace_handler
 from datetime import datetime
 import os
@@ -73,17 +75,17 @@ def train(
 
     if run_ssl:
         model = FoodNetExtraDW()
-        summary(model, [(3, 256, 256), (3, 256, 256)], device=str(device))
-        criterion = ImprovedContrastiveLoss()
+        summary(model, [(3, 256, 256), (3, 256, 256)], print_network=True, device=str(device))
+        criterion = ContrastiveLoss()
     else:
-        model = load_pretrained_model('models/best/FoodNetExtraDW_epoch_10_lr_0.003172_T0_25_train_loss_0.0084_val_loss_inf.pt')
-        summary(model, (3, 256, 256), device=str(device))
+        model = load_pretrained_model('models/best/FoodNetExtraDW_epoch_4_lr_0.000090_T0_25_train_loss_4.4485_val_loss_4.3950.pt')
+        summary(model, (3, 256, 256), print_network=False, device=str(device))
         criterion = nn.CrossEntropyLoss()
     model.to(device)
 
-    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    optimizer = AdamW(model.parameters(), lr=lr)
     t_0 = 25
-    scheduler = CosineAnnealingWarmRestarts(optimizer, t_0, eta_min=lr / 10)
+    scheduler = CosineAnnealingWarmRestarts(optimizer, t_0, eta_min=lr / 1000)
     
     logs_dir = get_logs_dir()
     writer = SummaryWriter(logs_dir)
@@ -156,11 +158,7 @@ def train(
 
         previous_train_loss = train_loss
 
-        # Reset DALI iterator if using DALI AFTER epoch
-        if is_dali:
-            trainloader.reset()
-            if isinstance(valloader, DALIGenericIterator):
-                valloader.reset()
+        # DALIGenericIterator reset() is called automatically thanks to auto_reset=True!
 
     writer.close()
 
@@ -201,7 +199,7 @@ def run_ssl_training_step(
     for i, data in enumerate(dataloader):
         # Handle different data formats
         if is_dali:
-            img1, img2 = data[0]['images'], data[1]['images']
+            img1, img2 = data[0]['view1'], data[0]['view2']
         else:
             img1, img2 = data[0].to(device), data[1].to(device) # type: ignore
 

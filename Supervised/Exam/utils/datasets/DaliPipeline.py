@@ -11,11 +11,13 @@ from typing import Dict, List, Tuple
 class FoodDALIPipeline(Pipeline):
     def __init__(self, image_paths: List[str], labels: List[int], 
                  batch_size: int, num_threads: int, device_id: int, 
-                 is_training: bool = True):
+                 is_training: bool = True, is_ssl: bool = False):
         super().__init__(batch_size=batch_size, 
                         num_threads=num_threads, 
                         device_id=device_id)
         
+        self.is_training = is_training
+        self.is_ssl = is_ssl
         self.input = fn.readers.file(
             files=image_paths,
             labels=labels,
@@ -29,8 +31,11 @@ class FoodDALIPipeline(Pipeline):
             output_type=types.DALIImageType.RGB
         )
 
-        self.crop_mirror_norm = fn.crop_mirror_normalize(
-            self.decode,
+    def create_augmented_view(self, image):
+        """Creates a single augmented view with random transformations"""
+        # Basic crop and normalize with random mirror
+        augmented = fn.crop_mirror_normalize(
+            image,
             dtype=types.DALIDataType.FLOAT,
             output_layout='HWC',
             crop=(256, 256),
@@ -40,42 +45,70 @@ class FoodDALIPipeline(Pipeline):
             device="gpu"
         )
         
-        if is_training:
-            self.colorjit = fn.color_twist(
-                self.crop_mirror_norm,
-                hue=0.1,
-                device="gpu"
-            )
-            self.blur = fn.gaussian_blur(
-                self.colorjit,
-                window_size=fn.random.choice([3, 5, 7]),
-                sigma=fn.random.uniform(range=(0.1, 0.5), dtype=types.DALIDataType.FLOAT),
-                device="gpu"
-            )
-            self.processed = self.blur
-        else:
-            self.processed = self.crop_mirror_norm
+        # Color augmentations
+        augmented = fn.color_twist(
+            augmented,
+            brightness=fn.random.uniform(range=(0.6, 1.4)),
+            contrast=fn.random.uniform(range=(0.6, 1.4)),
+            saturation=fn.random.uniform(range=(0.6, 1.4)),
+            hue=fn.random.uniform(range=(-0.1, 0.1)),
+            device="gpu"
+        )
         
-        self.transformed = fn.transpose(
-            self.processed,
+        # Random blur
+        augmented = fn.gaussian_blur(
+            augmented,
+            window_size=fn.random.choice([3, 5, 7]),
+            sigma=fn.random.uniform(range=(0.1, 0.5), dtype=types.DALIDataType.FLOAT),
+            device="gpu"
+        )
+        
+        # Channel transpose for PyTorch
+        return fn.transpose(
+            augmented,
             perm=[2, 0, 1],
             device="gpu"
         )
 
-        self.labels = fn.cast(self.input[1], dtype=types.DALIDataType.INT64)
-
     def define_graph(self):
         images, labels = self.input
-        return [self.transformed, self.labels.gpu()]
+        
+        if not self.is_ssl:
+            # Original supervised learning pipeline
+            if self.is_training:
+                processed = self.create_augmented_view(self.decode)
+            else:
+                # For validation/testing, no augmentations except normalization
+                processed = fn.crop_mirror_normalize(
+                    self.decode,
+                    dtype=types.DALIDataType.FLOAT,
+                    output_layout='HWC',
+                    crop=(256, 256),
+                    mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+                    std=[0.229 * 255, 0.224 * 255, 0.225 * 255],
+                    mirror=False,
+                    device="gpu"
+                )
+                processed = fn.transpose(
+                    processed,
+                    perm=[2, 0, 1],
+                    device="gpu"
+                )
+            return [processed, fn.cast(self.input[1], dtype=types.DALIDataType.INT64).gpu()]
+        else:
+            # Self-supervised learning pipeline - create two different views
+            view1 = self.create_augmented_view(self.decode)
+            view2 = self.create_augmented_view(self.decode)
+            return [view1, view2]
 
 def create_dataloaders(
     train_image_paths_labels: Dict[str, str],
     val_image_paths_labels: Dict[str, str],
     test_image_paths_labels: Dict[str, str],
     batch_size: int = 32,
-    num_threads: int = 4,
-    device_id: int = 0
-) -> Tuple[DALIGenericIterator, DALIGenericIterator, DALIGenericIterator]:
+    num_threads: int = 10,
+    device_id: int = 0,
+) -> Tuple[DALIGenericIterator, DALIGenericIterator, DALIGenericIterator, DALIGenericIterator]:
     """
     Create train, validation, and test DALI iterators.
     
@@ -90,10 +123,14 @@ def create_dataloaders(
     Returns:
         Tuple of (train_iterator, val_iterator, test_iterator)
     """
-    def create_iterator(image_paths_labels: Dict[str, str], is_training: bool) -> DALIGenericIterator:
+    def create_iterator(image_paths_labels: Dict[str, str], is_training: bool, is_ssl_training: bool = False) -> DALIGenericIterator:
         image_paths = list(image_paths_labels.keys())
-        label_to_idx = {label: idx for idx, label in enumerate(sorted(set(image_paths_labels.values())))}
-        labels = [label_to_idx[image_paths_labels[path]] for path in image_paths]
+        if not is_ssl_training:
+            label_to_idx = {label: idx for idx, label in enumerate(sorted(set(image_paths_labels.values())))}
+            labels = [label_to_idx[image_paths_labels[path]] for path in image_paths]
+        else:
+            # For SSL, we don't need actual labels, just dummy values
+            labels = [0] * len(image_paths)
         
         pipeline = FoodDALIPipeline(
             image_paths=image_paths,
@@ -101,21 +138,25 @@ def create_dataloaders(
             batch_size=batch_size,
             num_threads=num_threads,
             device_id=device_id,
-            is_training=is_training
+            is_training=is_training,
+            is_ssl=is_ssl_training
         )
         
         pipeline.build()
         
+        output_map = ['view1', 'view2'] if is_ssl_training else ['images', 'labels']
+        
         return DALIGenericIterator(
             pipelines=pipeline,
-            output_map=['images', 'labels'],
+            output_map=output_map,
             size=len(image_paths),
             auto_reset=True,
             last_batch_policy=LastBatchPolicy.FILL
         )
     
+    train_ssl_iterator = create_iterator(train_image_paths_labels, is_training=True, is_ssl_training=True)
     train_iterator = create_iterator(train_image_paths_labels, is_training=True)
     val_iterator = create_iterator(val_image_paths_labels, is_training=False)
     test_iterator = create_iterator(test_image_paths_labels, is_training=False)
     
-    return train_iterator, val_iterator, test_iterator
+    return train_ssl_iterator, train_iterator, val_iterator, test_iterator
